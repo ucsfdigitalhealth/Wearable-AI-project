@@ -34,7 +34,7 @@ enum RecordingMode: String, Codable, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .continuous: "Continuous"
-        case .scheduled: "Scheduled (daytime only)"
+        case .scheduled: "Scheduled (e.g., daytime only)"
         }
     }
 }

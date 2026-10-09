@@ -29,6 +29,7 @@ struct MoreView: View {
                 }
             }
             .navigationTitle("More")
+            .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: MoreDestination.self) { destination in
                 switch destination {
                 case .device: DeviceView()

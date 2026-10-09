@@ -60,6 +60,7 @@ struct TrendsView: View {
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Trends")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 

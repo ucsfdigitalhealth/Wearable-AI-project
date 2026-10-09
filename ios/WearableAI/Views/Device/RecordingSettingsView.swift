@@ -36,32 +36,25 @@ struct RecordingSettingsView: View {
             }
 
             Section("Recording Mode") {
-                Picker("Recording Mode", selection: $draft.mode) {
-                    ForEach(RecordingMode.allCases) { mode in
-                        Text(mode.title).tag(mode)
+                ForEach(RecordingMode.allCases) { mode in
+                    RadioRow(title: mode.title, isSelected: draft.mode == mode) {
+                        draft.mode = mode
                     }
                 }
-                .pickerStyle(.inline)
-                .labelsHidden()
             }
 
             if showsSaveButton {
                 Section {
-                    Button {
+                    PrimaryButton(title: "Save Settings", isLoading: saving) {
                         Task {
                             saving = true
                             await device.apply(draft)
                             saving = false
                             dismiss()
                         }
-                    } label: {
-                        HStack {
-                            Spacer()
-                            if saving { ProgressView() } else { Text("Save Settings").bold() }
-                            Spacer()
-                        }
                     }
                     .disabled(draft == device.recordingSettings || saving)
+                    .plainListRow()
                 }
             }
         }

@@ -15,43 +15,45 @@ struct HomeView: View {
                 VStack(spacing: 16) {
                     deviceCard
 
-                    SummaryCard(title: "Steps", systemImage: "figure.walk", tint: .green) {
-                        Text(today.steps.formatted())
-                    } chart: {
-                        Chart(Array(MockHealthData.hourlySteps(for: .now).enumerated()), id: \.offset) { hour, steps in
-                            BarMark(x: .value("Hour", hour), y: .value("Steps", steps))
-                                .foregroundStyle(.green)
+                    Card {
+                        SummaryRow(title: "Steps", systemImage: "figure.walk", tint: .green) {
+                            Text(today.steps.formatted())
+                        } chart: {
+                            Chart(Array(MockHealthData.hourlySteps(for: .now).enumerated()), id: \.offset) { hour, steps in
+                                BarMark(x: .value("Hour", hour), y: .value("Steps", steps))
+                                    .foregroundStyle(.green)
+                            }
                         }
-                    }
-
-                    SummaryCard(title: "Heart Rate", systemImage: "heart.fill", tint: .red) {
-                        HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text("\(today.restingHR)")
-                            Text("bpm (resting)").font(.caption).foregroundStyle(.secondary)
+                        Divider()
+                        SummaryRow(title: "Heart Rate", systemImage: "heart.fill", tint: .red) {
+                            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                                Text("\(today.restingHR)")
+                                Text("bpm (resting)").font(.caption).foregroundStyle(.secondary)
+                            }
+                        } chart: {
+                            Chart(Array(MockHealthData.hourlyHeartRate(for: .now).enumerated()), id: \.offset) { hour, bpm in
+                                LineMark(x: .value("Hour", hour), y: .value("BPM", bpm))
+                                    .interpolationMethod(.catmullRom)
+                                    .foregroundStyle(.red)
+                            }
+                            .chartYScale(domain: .automatic(includesZero: false))
                         }
-                    } chart: {
-                        Chart(Array(MockHealthData.hourlyHeartRate(for: .now).enumerated()), id: \.offset) { hour, bpm in
-                            LineMark(x: .value("Hour", hour), y: .value("BPM", bpm))
-                                .interpolationMethod(.catmullRom)
-                                .foregroundStyle(.red)
+                        Divider()
+                        SummaryRow(title: "Sleep", systemImage: "moon.zzz.fill", tint: .purple) {
+                            Text(formatMinutes(today.sleepMinutes))
+                        } chart: {
+                            Chart(recent) { day in
+                                BarMark(x: .value("Day", day.date, unit: .day), y: .value("Hours", Double(day.sleepMinutes) / 60))
+                                    .foregroundStyle(.purple)
+                            }
                         }
-                        .chartYScale(domain: .automatic(includesZero: false))
-                    }
-
-                    SummaryCard(title: "Sleep", systemImage: "moon.zzz.fill", tint: .purple) {
-                        Text(formatMinutes(today.sleepMinutes))
-                    } chart: {
-                        Chart(recent) { day in
-                            BarMark(x: .value("Day", day.date, unit: .day), y: .value("Hours", Double(day.sleepMinutes) / 60))
-                                .foregroundStyle(.purple)
+                        Divider()
+                        SummaryRow(title: "Skin/Stress (PPG)", systemImage: "sun.max.fill", tint: .orange) {
+                            Text(stressLevel.rawValue)
+                                .font(.title3.weight(.semibold))
+                        } chart: {
+                            EmptyView()
                         }
-                    }
-
-                    SummaryCard(title: "Skin/Stress (PPG)", systemImage: "sun.max.fill", tint: .orange) {
-                        Text(stressLevel.rawValue)
-                            .font(.title3.weight(.semibold))
-                    } chart: {
-                        EmptyView()
                     }
 
                     Text("Summary values are simulated until the data-processing pipeline is ready.")
@@ -63,6 +65,7 @@ struct HomeView: View {
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Today")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 
@@ -123,8 +126,8 @@ struct HomeView: View {
     }
 }
 
-/// A metric card with a big value on the left and a small chart on the right.
-private struct SummaryCard<Value: View, ChartContent: View>: View {
+/// A summary row: icon, title and value on the left, a small chart on the right.
+private struct SummaryRow<Value: View, ChartContent: View>: View {
     let title: String
     let systemImage: String
     let tint: Color
@@ -132,22 +135,24 @@ private struct SummaryCard<Value: View, ChartContent: View>: View {
     @ViewBuilder var chart: ChartContent
 
     var body: some View {
-        Card {
-            HStack(alignment: .center, spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Label(title, systemImage: systemImage)
-                        .font(.subheadline)
-                        .foregroundStyle(tint)
-                    value
-                        .font(.system(size: 28, weight: .semibold, design: .rounded))
-                }
-                Spacer(minLength: 0)
-                chart
-                    .chartXAxis(.hidden)
-                    .chartYAxis(.hidden)
-                    .frame(width: 130, height: 56)
+        HStack(alignment: .center, spacing: 16) {
+            Image(systemName: systemImage)
+                .font(.title2)
+                .foregroundStyle(tint)
+                .frame(width: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                value
+                    .font(.title3.weight(.semibold))
             }
+            Spacer(minLength: 0)
+            chart
+                .chartXAxis(.hidden)
+                .chartYAxis(.hidden)
+                .frame(width: 120, height: 44)
         }
+        .padding(.vertical, 4)
     }
 }
 

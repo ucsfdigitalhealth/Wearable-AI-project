@@ -16,66 +16,51 @@ struct ExportView: View {
     @State private var from = Calendar.current.date(byAdding: .day, value: -7, to: .now)!
     @State private var to = Date.now
     @State private var exported: [ExportedFile] = []
+    @State private var showingUpload = false
 
     var body: some View {
         Form {
-            Section("Data") {
+            Section {
                 ForEach(SensorStream.allCases) { stream in
-                    Button {
+                    CheckboxRow(isOn: streams.contains(stream)) {
                         if streams.contains(stream) {
                             streams.remove(stream)
                         } else {
                             streams.insert(stream)
                         }
                     } label: {
-                        HStack {
-                            Image(systemName: streams.contains(stream) ? "checkmark.square.fill" : "square")
-                                .foregroundStyle(streams.contains(stream) ? Color.accentColor : .secondary)
-                                .font(.title3)
-                            Text("\(stream.title) (\(stream.rateLabel))")
-                                .foregroundStyle(.primary)
-                            Spacer()
-                        }
-                        .contentShape(Rectangle())
+                        Text("\(stream.title) (\(stream.rateLabel))")
                     }
-                    .buttonStyle(.plain)
                 }
             }
 
             Section("Time Range") {
-                Picker("Time Range", selection: $timeRange) {
-                    ForEach(TimeRange.allCases) { Text($0.title).tag($0) }
+                RadioRow(title: TimeRange.all.title, subtitle: fullRangeText, isSelected: timeRange == .all) {
+                    timeRange = .all
                 }
-                .pickerStyle(.inline)
-                .labelsHidden()
-
+                RadioRow(title: TimeRange.custom.title, isSelected: timeRange == .custom) {
+                    timeRange = .custom
+                }
                 if timeRange == .custom {
                     DatePicker("From", selection: $from)
                     DatePicker("To", selection: $to)
-                } else if let first = sessions.sessions.last, let last = sessions.sessions.first {
-                    Text("\(first.startDate.formatted(date: .abbreviated, time: .shortened)) – \(last.endDate.formatted(date: .abbreviated, time: .shortened))")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
             }
 
             Section("File Format") {
-                LabeledContent("Format", value: "CSV (.csv)")
+                RadioRow(title: "CSV (.csv)", isSelected: true) {}
             }
 
             Section {
-                Button {
+                PrimaryButton(title: "Export to CSV") {
                     exported = exports.export(days: selectedSessions, allSessions: sessions.sessions, streams: streams)
-                } label: {
-                    Text("Export to CSV")
-                        .bold()
-                        .frame(maxWidth: .infinity)
                 }
                 .disabled(streams.isEmpty || selectedSessions.isEmpty)
+                .plainListRow()
             } footer: {
-                Text(selectedSessions.isEmpty
-                     ? "No recordings in this range."
-                     : "\(selectedSessions.count) recordings. Files will be saved to your phone.")
+                Text(selectedSessions.isEmpty ? "No recordings in this range." : "Files will be saved to your phone.")
+                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
             }
 
             if !exported.isEmpty {
@@ -86,15 +71,22 @@ struct ExportView: View {
                     ShareLink(items: exported.map(\.url)) {
                         Label("Share files", systemImage: "square.and.arrow.up")
                     }
-                    NavigationLink {
-                        UploadView()
-                    } label: {
-                        Label("Upload to Dropbox", systemImage: "icloud.and.arrow.up")
-                    }
+                }
+                Section {
+                    PrimaryButton(title: "Upload to Dropbox") { showingUpload = true }
+                        .plainListRow()
                 }
             }
         }
         .navigationTitle("Export Data")
+        .navigationDestination(isPresented: $showingUpload) { UploadView() }
+    }
+
+    private var fullRangeText: String? {
+        guard let first = sessions.sessions.last, let last = sessions.sessions.first else { return nil }
+        let start = first.startDate.formatted(date: .abbreviated, time: .shortened)
+        let end = last.endDate.formatted(date: .abbreviated, time: .shortened)
+        return "\(start) – \(end)"
     }
 
     private var selectedSessions: [RecordingSession] {

@@ -118,6 +118,7 @@ struct InsightsView: View {
                 }
             }
             .navigationTitle("Insights")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }

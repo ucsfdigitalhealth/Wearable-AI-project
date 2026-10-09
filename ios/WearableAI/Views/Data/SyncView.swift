@@ -6,6 +6,7 @@ struct SyncView: View {
     @Environment(SessionStore.self) private var sessions
     @Environment(ExportStore.self) private var exports
     @Environment(SyncManager.self) private var sync
+    @State private var showingUpload = false
 
     var body: some View {
         List {
@@ -47,26 +48,23 @@ struct SyncView: View {
 
                 Section {
                     if sync.currentStep == .complete {
-                        NavigationLink {
-                            UploadView()
-                        } label: {
-                            Label("Upload to Dropbox", systemImage: "icloud.and.arrow.up")
-                                .fontWeight(.semibold)
-                        }
+                        PrimaryButton(title: "Upload to Dropbox") { showingUpload = true }
+                            .plainListRow()
                     } else {
-                        Button {
+                        PrimaryButton(
+                            title: device.pendingRecordings.isEmpty ? "Check for Recordings" : "Start Sync",
+                            isLoading: sync.isSyncing
+                        ) {
                             Task { await sync.sync(device: device, sessions: sessions, exports: exports) }
-                        } label: {
-                            Text(device.pendingRecordings.isEmpty ? "Check for Recordings" : "Start Sync")
-                                .bold()
-                                .frame(maxWidth: .infinity)
                         }
                         .disabled(sync.isSyncing)
+                        .plainListRow()
                     }
                 }
             }
         }
         .navigationTitle("Sync Recordings")
+        .navigationDestination(isPresented: $showingUpload) { UploadView() }
         .task {
             if sync.currentStep == .complete { sync.reset() }
             if DemoLaunch.autoStart && !sync.isSyncing {

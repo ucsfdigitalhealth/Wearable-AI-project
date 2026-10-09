@@ -3,6 +3,7 @@ import SwiftUI
 /// Device connection: scan → connect (found / pairing / connected) → device overview.
 struct DeviceView: View {
     @Environment(DeviceManager.self) private var device
+    @State private var showingSync = false
 
     var body: some View {
         List {
@@ -15,7 +16,8 @@ struct DeviceView: View {
                 scanSections
             }
         }
-        .navigationTitle("Device")
+        .navigationTitle(device.connectedDevice == nil ? "Connect Device" : "Device Connected")
+        .navigationDestination(isPresented: $showingSync) { SyncView() }
     }
 
     // MARK: Connected
@@ -33,13 +35,8 @@ struct DeviceView: View {
             }
             .padding(.vertical, 4)
 
-            NavigationLink {
-                SyncView()
-            } label: {
-                Label("Sync Recordings", systemImage: "arrow.triangle.2.circlepath")
-                    .foregroundStyle(Color.accentColor)
-                    .fontWeight(.semibold)
-            }
+            PrimaryButton(title: "Sync Recordings") { showingSync = true }
+                .padding(.vertical, 4)
 
             if device.pendingRecordings.isEmpty {
                 Label("No new recordings", systemImage: "checkmark.circle")
@@ -51,8 +48,6 @@ struct DeviceView: View {
                 )
                 .foregroundStyle(.secondary)
             }
-        } header: {
-            Text("Device Connected")
         }
 
         Section {
@@ -93,7 +88,10 @@ struct DeviceView: View {
             VStack(spacing: 12) {
                 DeviceIcon(size: 96)
                 Text("Polar Verity Sense").font(.headline)
-                Text(target.name).font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Connecting…").foregroundStyle(.secondary)
+                }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical)
@@ -106,10 +104,10 @@ struct DeviceView: View {
         }
 
         Section {
-            Button("Cancel", role: .cancel) {
+            SecondaryButton(title: "Cancel") {
                 device.cancelConnect()
             }
-            .frame(maxWidth: .infinity)
+            .plainListRow()
         }
     }
 
@@ -164,13 +162,14 @@ struct DeviceView: View {
         }
 
         Section {
-            Button(device.isScanning ? "Stop scanning" : "Scan for devices") {
+            PrimaryButton(title: device.isScanning ? "Stop Scanning" : "Scan for Devices") {
                 if device.isScanning {
                     device.stopScan()
                 } else {
                     device.startScan()
                 }
             }
+            .plainListRow()
         }
     }
 }

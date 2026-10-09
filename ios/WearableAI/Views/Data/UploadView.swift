@@ -8,6 +8,7 @@ struct UploadView: View {
     @AppStorage("uploadInBackground") private var uploadInBackground = true
 
     @State private var selected: Set<URL> = []
+    @State private var showAllDays = false
 
     var body: some View {
         List {
@@ -24,45 +25,45 @@ struct UploadView: View {
                     Text("No CSV files yet. Sync or export recordings first.")
                         .foregroundStyle(.secondary)
                 }
-                ForEach(exports.files) { file in
-                    Button {
+                ForEach(visibleFiles) { file in
+                    CheckboxRow(isOn: selected.contains(file.url)) {
                         toggle(file)
                     } label: {
-                        HStack {
-                            Image(systemName: selected.contains(file.url) ? "checkmark.square.fill" : "square")
-                                .foregroundStyle(selected.contains(file.url) ? Color.accentColor : .secondary)
-                            Image(systemName: "doc.text")
-                                .foregroundStyle(.secondary)
-                            VStack(alignment: .leading) {
-                                Text(file.name).foregroundStyle(.primary)
-                                Text(file.day).font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if uploads.uploadedFiles.contains(file.url) {
-                                Image(systemName: "checkmark.icloud")
-                                    .foregroundStyle(.green)
-                            }
-                            Text(file.sizeBytes.fileSizeText)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        Image(systemName: "doc.text")
+                            .foregroundStyle(Color.accentColor)
+                        Text(file.name)
+                        Spacer()
+                        if uploads.uploadedFiles.contains(file.url) {
+                            Image(systemName: "checkmark.icloud")
+                                .foregroundStyle(.green)
                         }
-                        .contentShape(Rectangle())
+                        Text(file.sizeBytes.fileSizeText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.plain)
+                }
+                if !showAllDays && visibleFiles.count < exports.files.count {
+                    Button("Show older files (\(exports.files.count - visibleFiles.count))") {
+                        showAllDays = true
+                    }
+                    .font(.subheadline)
                 }
             }
 
             Section {
-                Button {
+                PrimaryButton(title: "Upload to Dropbox", isLoading: uploads.status == .uploading) {
                     Task { await uploads.upload(selectedFiles, participantId: participantId) }
-                } label: {
-                    Text("Upload to Dropbox")
-                        .bold()
-                        .frame(maxWidth: .infinity)
                 }
                 .disabled(selected.isEmpty || uploads.status == .uploading)
+                .plainListRow()
+            }
 
-                Toggle("Upload in background", isOn: $uploadInBackground)
+            Section {
+                CheckboxRow(isOn: uploadInBackground) {
+                    uploadInBackground.toggle()
+                } label: {
+                    Text("Upload in background")
+                }
             }
 
             statusSection
@@ -113,6 +114,12 @@ struct UploadView: View {
         }
     }
 
+    /// The latest day's files, or every file after "Show older files".
+    private var visibleFiles: [ExportedFile] {
+        guard !showAllDays, let latestDay = exports.files.map(\.day).max() else { return exports.files }
+        return exports.files.filter { $0.day == latestDay }
+    }
+
     private var selectedFiles: [ExportedFile] {
         exports.files.filter { selected.contains($0.url) }
     }
@@ -125,8 +132,9 @@ struct UploadView: View {
         }
     }
 
+    /// Selects the visible files that haven't been uploaded yet.
     private func selectNotYetUploaded() {
-        selected = Set(exports.files.map(\.url).filter { !uploads.uploadedFiles.contains($0) })
+        selected = Set(visibleFiles.map(\.url).filter { !uploads.uploadedFiles.contains($0) })
     }
 }
 

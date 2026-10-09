@@ -41,14 +41,23 @@ struct OnboardingView: View {
             .navigationTitle(studyName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if page > 0 {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("Back") { page -= 1 }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        page -= 1
+                    } label: {
+                        Image(systemName: "chevron.left")
                     }
+                    .disabled(page == 0)
                 }
-                if page < lastPage {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Skip") { hasOnboarded = true }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        if page < lastPage {
+                            page += 1
+                        } else {
+                            hasOnboarded = true
+                        }
+                    } label: {
+                        Image(systemName: "chevron.right")
                     }
                 }
             }
