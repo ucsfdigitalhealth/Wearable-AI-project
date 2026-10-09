@@ -94,7 +94,7 @@ struct SyncView: View {
         case .saving:
             "Saving to phone…"
         case .complete:
-            "\(sync.lastSyncCount) recordings synced."
+            sync.lastSyncCount == 0 ? "Everything is already synced." : "\(sync.lastSyncCount) recordings synced."
         }
     }
 

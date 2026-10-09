@@ -34,8 +34,11 @@ struct ExportView: View {
                                 .font(.title3)
                             Text("\(stream.title) (\(stream.rateLabel))")
                                 .foregroundStyle(.primary)
+                            Spacer()
                         }
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
                 }
             }
 

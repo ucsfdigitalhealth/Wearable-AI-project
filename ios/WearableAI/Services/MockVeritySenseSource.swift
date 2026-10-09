@@ -79,10 +79,12 @@ final class MockVeritySenseSource: SensorDataSource {
     private static func makeStoredRecordings(streams: Set<SensorStream>) -> [DeviceRecording] {
         let streams = SensorStream.allCases.filter(streams.contains)
         let bytesPerSecond = streams.reduce(0.0) { $0 + $1.sampleRate * 16 }
+        // Round to 10 minutes so reconnecting shows the same recordings (with the same start times).
+        let now = (Date.now.timeIntervalSince1970 / 600).rounded(.down) * 600
         return [(-5.0, 300.0), (-2.5, 240.0)].map { hoursAgo, duration in
-            let start = Date.now.addingTimeInterval(hoursAgo * 3600)
+            let start = Date(timeIntervalSince1970: now + hoursAgo * 3600)
             return DeviceRecording(
-                id: UUID().uuidString,
+                id: "rec-\(Int(start.timeIntervalSince1970))",
                 startDate: start,
                 duration: duration,
                 sizeBytes: Int64(bytesPerSecond * duration),

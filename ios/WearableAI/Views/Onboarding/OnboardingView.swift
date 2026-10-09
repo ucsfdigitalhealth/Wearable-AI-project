@@ -100,13 +100,7 @@ struct ArmbandIllustration: View {
             Circle()
                 .fill(Color.accentColor.opacity(0.12))
                 .frame(width: 160, height: 160)
-            Image(systemName: "figure.arms.open")
-                .font(.system(size: 72))
-                .foregroundStyle(Color.accentColor)
-            Capsule()
-                .fill(.black)
-                .frame(width: 34, height: 14)
-                .offset(x: -36, y: -14)
+            DeviceIcon(size: 84)
         }
     }
 }

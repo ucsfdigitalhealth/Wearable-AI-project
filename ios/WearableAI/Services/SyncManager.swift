@@ -75,15 +75,19 @@ final class SyncManager {
             return
         }
 
+        // Skip recordings already on the phone (e.g. a sync that was interrupted earlier).
+        let existing = Set(sessions.sessions.map { "\($0.deviceId)-\($0.startDate.timeIntervalSince1970)" })
+        downloaded.removeAll { existing.contains("\($0.deviceId)-\($0.startDate.timeIntervalSince1970)") }
+
+        currentStep = .converting
+        exports.export(days: downloaded, allSessions: sessions.sessions + downloaded, streams: Set(SensorStream.allCases))
+        try? await Task.sleep(for: .milliseconds(700))
+
         currentStep = .saving
         for session in downloaded {
             sessions.save(session)
         }
         try? await Task.sleep(for: .milliseconds(500))
-
-        currentStep = .converting
-        exports.export(days: downloaded, allSessions: sessions.sessions, streams: Set(SensorStream.allCases))
-        try? await Task.sleep(for: .milliseconds(700))
 
         lastSyncDate = .now
         lastSyncCount = downloaded.count

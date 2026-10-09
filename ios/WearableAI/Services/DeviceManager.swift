@@ -141,7 +141,10 @@ final class DeviceManager {
     func refreshRecordings() async {
         guard connectedDevice != nil else { return }
         do {
+            // Hide recordings that are already on the phone (e.g. from an interrupted sync).
+            let onPhone = Set(sessionStore.sessions.map(\.startDate.timeIntervalSince1970))
             pendingRecordings = try await source.listRecordings()
+                .filter { !onPhone.contains($0.startDate.timeIntervalSince1970) }
         } catch {
             lastError = error.localizedDescription
         }
