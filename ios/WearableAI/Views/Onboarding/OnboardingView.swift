@@ -12,7 +12,7 @@ struct OnboardingView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 TabView(selection: $page) {
-                    WelcomePage(studyName: studyName).tag(0)
+                    WelcomePage().tag(0)
                     WearPage().tag(1)
                     DeviceView().tag(2)
                     RecordingSettingsView(showsSaveButton: false).tag(3)
@@ -57,15 +57,13 @@ struct OnboardingView: View {
 }
 
 private struct WelcomePage: View {
-    let studyName: String
-
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
             ArmbandIllustration()
             Text("Welcome!")
                 .font(.largeTitle.bold())
-            Text("Thanks for joining the \(studyName). This app collects data from your Polar Verity Sense and sends it securely to the research team.")
+            Text("Wear your Polar Verity Sense on your upper arm as shown.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 32)
@@ -100,8 +98,16 @@ struct ArmbandIllustration: View {
             Circle()
                 .fill(Color.accentColor.opacity(0.12))
                 .frame(width: 160, height: 160)
-            DeviceIcon(size: 84)
+            // Upper arm with the strap and sensor on it.
+            Capsule()
+                .fill(Color(red: 0.93, green: 0.76, blue: 0.62))
+                .frame(width: 64, height: 150)
+            RoundedRectangle(cornerRadius: 4)
+                .fill(.black)
+                .frame(width: 70, height: 20)
+            DeviceIcon(size: 44)
         }
+        .clipShape(Circle())
     }
 }
 
