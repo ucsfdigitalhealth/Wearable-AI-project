@@ -52,12 +52,27 @@ jobs:
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" "$APP"
           mkdir -p screenshots
-          for tab in live device sessions settings; do
-            xcrun simctl terminate "$UDID" "$BUNDLE_ID" || true
-            xcrun simctl launch "$UDID" "$BUNDLE_ID" -demoTab "$tab" -demoConnect YES
-            sleep 8
-            xcrun simctl io "$UDID" screenshot "screenshots/$tab.png"
-          done
+          # name | launch arguments | seconds to wait before the screenshot
+          while IFS='|' read -r name args wait; do
+            xcrun simctl terminate "$UDID" "$BUNDLE_ID" < /dev/null || true
+            xcrun simctl launch "$UDID" "$BUNDLE_ID" $args < /dev/null
+            sleep "$wait"
+            xcrun simctl io "$UDID" screenshot "screenshots/$name.png" < /dev/null
+          done <<'SHOTS'
+          01-onboarding|-demoScreen onboarding|4
+          02-home|-demoTab home -demoConnect YES|6
+          03-trends|-demoTab trends|4
+          04-insights|-demoTab insights|4
+          05-more|-demoTab more|4
+          06-device|-demoTab more -demoScreen device -demoConnect YES|6
+          07-recording-settings|-demoTab more -demoScreen recordingSettings|4
+          08-sync-in-progress|-demoTab more -demoScreen sync -demoConnect YES -demoAutoStart YES|7
+          09-sync-complete|-demoTab more -demoScreen sync -demoConnect YES -demoAutoStart YES|16
+          10-export|-demoTab more -demoScreen export|4
+          11-upload|-demoTab more -demoScreen upload -demoAutoStart YES|8
+          12-recordings|-demoTab more -demoScreen recordings|4
+          13-live-data|-demoTab more -demoScreen live -demoConnect YES|8
+          SHOTS
 
       - name: Upload screenshots
         if: always()

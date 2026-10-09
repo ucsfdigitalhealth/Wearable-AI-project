@@ -40,14 +40,14 @@ struct SessionDetailView: View {
                 }
 
                 Card(title: "Raw data") {
-                    LabeledContent("PPG samples", value: session.ppg.count.formatted())
-                    LabeledContent("Accelerometer samples", value: session.acc.count.formatted())
-                    LabeledContent("Heart rate samples", value: session.hr.count.formatted())
+                    ForEach(availableStreams) { stream in
+                        LabeledContent("\(stream.title) samples", value: session.sampleCount(stream).formatted())
+                    }
                     LabeledContent("Device", value: session.deviceName)
                 }
 
                 Card(title: "Export CSV") {
-                    ForEach(SessionCSVExport.Stream.allCases) { stream in
+                    ForEach(availableStreams) { stream in
                         let export = SessionCSVExport(session: session, stream: stream)
                         ShareLink(item: export, preview: SharePreview(export.fileName)) {
                             Label(stream.title, systemImage: "square.and.arrow.up")
@@ -75,6 +75,10 @@ struct SessionDetailView: View {
                 dismiss()
             }
         }
+    }
+
+    private var availableStreams: [SensorStream] {
+        SensorStream.allCases.filter { session.sampleCount($0) > 0 }
     }
 
     private var summaryGrid: some View {

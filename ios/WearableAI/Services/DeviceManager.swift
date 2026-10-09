@@ -7,8 +7,8 @@ enum LiveDisplay {
     static let hrHistoryLength = 120
 }
 
-/// Holds connection state, keeps short rolling windows of live data for the charts,
-/// and records data into sessions.
+/// Holds connection state, the device's pending recordings and recording settings,
+/// and short rolling windows of live data for the Live Data screen.
 @MainActor
 @Observable
 final class DeviceManager {
@@ -19,9 +19,19 @@ final class DeviceManager {
         case connected(DeviceInfo)
     }
 
+    enum ConnectStep: Int, Comparable {
+        case found, pairing, connected
+
+        static func < (lhs: ConnectStep, rhs: ConnectStep) -> Bool { lhs.rawValue < rhs.rawValue }
+    }
+
     private(set) var state: ConnectionState = .disconnected
+    private(set) var connectStep: ConnectStep = .found
     private(set) var discoveredDevices: [DiscoveredDevice] = []
     private(set) var lastError: String?
+
+    private(set) var pendingRecordings: [DeviceRecording] = []
+    private(set) var recordingSettings = RecordingSettings.load()
 
     private(set) var recentPPG: [PPGSample] = []
     private(set) var recentACC: [ACCSample] = []
@@ -38,6 +48,7 @@ final class DeviceManager {
     @ObservationIgnored private let source: SensorDataSource
     @ObservationIgnored private let sessionStore: SessionStore
     @ObservationIgnored private var scanTask: Task<Void, Never>?
+    @ObservationIgnored private var connectTask: Task<Void, Never>?
     @ObservationIgnored private var streamTasks: [Task<Void, Never>] = []
 
     init(source: SensorDataSource, sessionStore: SessionStore) {
@@ -53,6 +64,7 @@ final class DeviceManager {
     var isScanning: Bool { state == .scanning }
     var isRecording: Bool { recordingStartDate != nil }
     var currentHR: HRSample? { hrHistory.last }
+    var pendingBytes: Int64 { pendingRecordings.reduce(0) { $0 + $1.sizeBytes } }
 
     // MARK: - Connection
 
@@ -82,16 +94,29 @@ final class DeviceManager {
     func connect(to device: DiscoveredDevice) {
         stopScan()
         state = .connecting(device)
-        Task {
+        connectStep = .found
+        connectTask = Task {
             do {
+                try await Task.sleep(for: .milliseconds(600))
+                self.connectStep = .pairing
                 let info = try await self.source.connect(to: device)
+                self.connectStep = .connected
                 self.state = .connected(info)
                 self.startStreams()
+                await self.refreshRecordings()
+            } catch is CancellationError {
+                self.state = .disconnected
             } catch {
                 self.lastError = error.localizedDescription
                 self.state = .disconnected
             }
         }
+    }
+
+    func cancelConnect() {
+        connectTask?.cancel()
+        connectTask = nil
+        state = .disconnected
     }
 
     func disconnect() {
@@ -103,6 +128,7 @@ final class DeviceManager {
         Task { await self.source.disconnect() }
 
         state = .disconnected
+        pendingRecordings = []
         recentPPG = []
         recentACC = []
         hrHistory = []
@@ -110,7 +136,37 @@ final class DeviceManager {
         movementIntensity = 0
     }
 
-    // MARK: - Recording
+    // MARK: - Offline recordings
+
+    func refreshRecordings() async {
+        guard connectedDevice != nil else { return }
+        do {
+            pendingRecordings = try await source.listRecordings()
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    /// Downloads a recording, then removes it from the device.
+    func download(
+        _ recording: DeviceRecording,
+        progress: @escaping @MainActor (Double) -> Void
+    ) async throws -> RecordingSession {
+        let session = try await source.download(recording, progress: progress)
+        try await source.deleteFromDevice(recording)
+        pendingRecordings.removeAll { $0.id == recording.id }
+        return session
+    }
+
+    func apply(_ settings: RecordingSettings) async {
+        settings.save()
+        recordingSettings = settings
+        if connectedDevice != nil {
+            try? await source.apply(settings)
+        }
+    }
+
+    // MARK: - Live recording
 
     func startRecording() {
         guard connectedDevice != nil, !isRecording else { return }
@@ -130,6 +186,8 @@ final class DeviceManager {
             endDate: .now,
             ppg: recordedPPG,
             acc: recordedACC,
+            gyro: [],
+            mag: [],
             hr: recordedHR
         )
         recordingStartDate = nil

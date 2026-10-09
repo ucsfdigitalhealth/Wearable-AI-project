@@ -4,21 +4,21 @@ struct DashboardView: View {
     @Environment(DeviceManager.self) private var device
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if device.connectedDevice == nil {
-                    ContentUnavailableView(
-                        "No device connected",
-                        systemImage: "dot.radiowaves.left.and.right",
-                        description: Text("Connect your Polar Verity Sense in the Device tab to see live data.")
-                    )
-                } else {
-                    liveContent
+        Group {
+            if device.connectedDevice == nil {
+                ContentUnavailableView {
+                    Label("No device connected", systemImage: "dot.radiowaves.left.and.right")
+                } description: {
+                    Text("Connect your Polar Verity Sense to stream live data.")
+                } actions: {
+                    NavigationLink("Connect Device") { DeviceView() }
                 }
+            } else {
+                liveContent
             }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("Live")
         }
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle("Live Data")
     }
 
     private var liveContent: some View {
@@ -81,7 +81,7 @@ private struct RecordingCard: View {
                     } else {
                         Text("Not recording")
                             .font(.subheadline.weight(.semibold))
-                        Text("Saved sessions appear in the Sessions tab.")
+                        Text("Saved recordings appear under More → Recordings.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -107,6 +107,8 @@ private struct RecordingCard: View {
 }
 
 #Preview {
-    DashboardView()
-        .previewEnvironment()
+    NavigationStack {
+        DashboardView()
+    }
+    .previewEnvironment()
 }

@@ -4,33 +4,31 @@ struct SessionsListView: View {
     @Environment(SessionStore.self) private var store
 
     var body: some View {
-        NavigationStack {
-            List {
-                ForEach(store.sessions) { session in
-                    NavigationLink {
-                        SessionDetailView(session: session)
-                    } label: {
-                        SessionRow(session: session)
-                    }
-                }
-                .onDelete { store.delete(atOffsets: $0) }
-            }
-            .overlay {
-                if store.sessions.isEmpty {
-                    ContentUnavailableView(
-                        "No sessions yet",
-                        systemImage: "list.bullet.rectangle",
-                        description: Text("Start a recording from the Live tab.")
-                    )
+        List {
+            ForEach(store.sessions) { session in
+                NavigationLink {
+                    SessionDetailView(session: session)
+                } label: {
+                    SessionRow(session: session)
                 }
             }
-            .toolbar {
-                if !store.sessions.isEmpty {
-                    EditButton()
-                }
-            }
-            .navigationTitle("Sessions")
+            .onDelete { store.delete(atOffsets: $0) }
         }
+        .overlay {
+            if store.sessions.isEmpty {
+                ContentUnavailableView(
+                    "No recordings yet",
+                    systemImage: "list.bullet.rectangle",
+                    description: Text("Sync your device to download recordings.")
+                )
+            }
+        }
+        .toolbar {
+            if !store.sessions.isEmpty {
+                EditButton()
+            }
+        }
+        .navigationTitle("Recordings")
     }
 }
 
@@ -59,6 +57,8 @@ func formatDuration(_ seconds: TimeInterval) -> String {
 }
 
 #Preview {
-    SessionsListView()
-        .previewEnvironment()
+    NavigationStack {
+        SessionsListView()
+    }
+    .previewEnvironment()
 }

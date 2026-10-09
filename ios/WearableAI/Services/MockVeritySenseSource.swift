@@ -5,6 +5,8 @@ import Foundation
 /// real sample rates.
 final class MockVeritySenseSource: SensorDataSource {
     private var model = SyntheticSignalModel()
+    private var settings = RecordingSettings.load()
+    private var storedRecordings: [DeviceRecording] = []
 
     private let nearbyDevices = [
         DiscoveredDevice(id: "C8A3B2F1", name: "Polar Sense C8A3B2F1", rssi: -58),
@@ -30,6 +32,7 @@ final class MockVeritySenseSource: SensorDataSource {
     func connect(to device: DiscoveredDevice) async throws -> DeviceInfo {
         try await Task.sleep(for: .seconds(1.5))
         model = SyntheticSignalModel()
+        storedRecordings = Self.makeStoredRecordings(streams: settings.enabledStreams)
         return DeviceInfo(
             id: device.id,
             name: device.name,
@@ -40,6 +43,53 @@ final class MockVeritySenseSource: SensorDataSource {
     }
 
     func disconnect() async {}
+
+    func apply(_ settings: RecordingSettings) async throws {
+        try await Task.sleep(for: .milliseconds(300))
+        self.settings = settings
+    }
+
+    func listRecordings() async throws -> [DeviceRecording] {
+        try await Task.sleep(for: .milliseconds(300))
+        return storedRecordings
+    }
+
+    func download(
+        _ recording: DeviceRecording,
+        progress: @escaping @MainActor (Double) -> Void
+    ) async throws -> RecordingSession {
+        // Pretend BLE transfer: about 3 seconds per recording.
+        let steps = 20
+        for step in 1...steps {
+            try await Task.sleep(for: .milliseconds(150))
+            await progress(Double(step) / Double(steps))
+        }
+        return SyntheticSessionFactory.makeSession(
+            start: recording.startDate,
+            duration: recording.duration,
+            streams: Set(recording.streams)
+        )
+    }
+
+    func deleteFromDevice(_ recording: DeviceRecording) async throws {
+        storedRecordings.removeAll { $0.id == recording.id }
+    }
+
+    /// Two recordings from earlier today, as if the participant wore the device.
+    private static func makeStoredRecordings(streams: Set<SensorStream>) -> [DeviceRecording] {
+        let streams = SensorStream.allCases.filter(streams.contains)
+        let bytesPerSecond = streams.reduce(0.0) { $0 + $1.sampleRate * 16 }
+        return [(-5.0, 300.0), (-2.5, 240.0)].map { hoursAgo, duration in
+            let start = Date.now.addingTimeInterval(hoursAgo * 3600)
+            return DeviceRecording(
+                id: UUID().uuidString,
+                startDate: start,
+                duration: duration,
+                sizeBytes: Int64(bytesPerSecond * duration),
+                streams: streams
+            )
+        }
+    }
 
     func ppgStream() -> AsyncStream<[PPGSample]> {
         let synth = PPGSynthesizer(model: model)

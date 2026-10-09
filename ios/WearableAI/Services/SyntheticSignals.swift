@@ -45,12 +45,34 @@ struct SyntheticSignalModel {
         return ACCSample(timestampNs: date.nanosecondsSince1970, x: Int32(x), y: Int32(y), z: Int32(z))
     }
 
+    func gyroSample(at date: Date) -> GyroSample {
+        let t = date.timeIntervalSince(origin)
+        let walk = walkingIntensity(at: date)
+        func noise() -> Double { .random(in: -0.8...0.8) }
+
+        let x = walk * 60 * sin(2 * .pi * 1.8 * t + 0.3) + noise()
+        let y = walk * 25 * sin(2 * .pi * 3.6 * t) + noise()
+        let z = 2 * sin(2 * .pi * t / 20) + walk * 40 * sin(2 * .pi * 1.8 * t + 1.9) + noise()
+        return GyroSample(timestampNs: date.nanosecondsSince1970, x: Float(x), y: Float(y), z: Float(z))
+    }
+
+    func magSample(at date: Date) -> MagSample {
+        let t = date.timeIntervalSince(origin)
+        let swing = walkingIntensity(at: date) * 0.08 * sin(2 * .pi * 1.8 * t)
+        func noise() -> Double { .random(in: -0.005...0.005) }
+
+        let x = 0.22 + swing + 0.02 * sin(2 * .pi * t / 60) + noise()
+        let y = -0.31 + swing / 2 + noise()
+        let z = 0.41 - swing + noise()
+        return MagSample(timestampNs: date.nanosecondsSince1970, x: Float(x), y: Float(y), z: Float(z))
+    }
+
     func hrSample(at date: Date) -> HRSample {
         let hr = heartRate(at: date)
         return HRSample(
             timestampNs: date.nanosecondsSince1970,
             bpm: Int(hr.rounded()),
-            rrIntervalsMs: [Int((60_000 / hr).rounded())],
+            ppiMs: [Int((60_000 / hr).rounded())],
             contactDetected: true
         )
     }
@@ -94,14 +116,20 @@ final class PPGSynthesizer {
     }
 }
 
-/// Builds whole fake sessions in one go, for the Sessions screen.
+/// Builds whole fake recordings in one go.
 enum SyntheticSessionFactory {
-    static func makeSession(start: Date, duration: TimeInterval) -> RecordingSession {
+    static func makeSession(
+        start: Date,
+        duration: TimeInterval,
+        streams: Set<SensorStream> = Set(SensorStream.allCases)
+    ) -> RecordingSession {
         let model = SyntheticSignalModel(origin: start)
         let ppgSynth = PPGSynthesizer(model: model)
 
-        func dates(rate: Double) -> [Date] {
-            (0..<Int(duration * rate)).map { start.addingTimeInterval(Double($0) / rate) }
+        func dates(_ stream: SensorStream) -> [Date] {
+            guard streams.contains(stream) else { return [] }
+            let rate = stream.sampleRate
+            return (0..<Int(duration * rate)).map { start.addingTimeInterval(Double($0) / rate) }
         }
 
         return RecordingSession(
@@ -110,9 +138,11 @@ enum SyntheticSessionFactory {
             deviceName: "Polar Sense C8A3B2F1 (simulated)",
             startDate: start,
             endDate: start.addingTimeInterval(duration),
-            ppg: dates(rate: VeritySense.ppgSampleRate).map(ppgSynth.sample(at:)),
-            acc: dates(rate: VeritySense.accSampleRate).map(model.accSample(at:)),
-            hr: dates(rate: 1).map(model.hrSample(at:))
+            ppg: dates(.ppg).map(ppgSynth.sample(at:)),
+            acc: dates(.acc).map(model.accSample(at:)),
+            gyro: dates(.gyro).map(model.gyroSample(at:)),
+            mag: dates(.mag).map(model.magSample(at:)),
+            hr: dates(.hr).map(model.hrSample(at:))
         )
     }
 }

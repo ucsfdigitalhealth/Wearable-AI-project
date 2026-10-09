@@ -1,56 +1,81 @@
 import SwiftUI
 
+/// Device connection: scan → connect (found / pairing / connected) → device overview.
 struct DeviceView: View {
     @Environment(DeviceManager.self) private var device
 
     var body: some View {
-        NavigationStack {
-            List {
-                switch device.state {
-                case .connected(let info):
-                    connectedSections(info)
-                case .connecting(let target):
-                    Section {
-                        HStack(spacing: 12) {
-                            ProgressView()
-                            Text("Connecting to \(target.name)…")
-                        }
-                    }
-                case .disconnected, .scanning:
-                    scanSections
-                }
+        List {
+            switch device.state {
+            case .connected(let info):
+                connectedSections(info)
+            case .connecting(let target):
+                connectingSections(target)
+            case .disconnected, .scanning:
+                scanSections
             }
-            .navigationTitle("Device")
         }
+        .navigationTitle("Device")
     }
+
+    // MARK: Connected
 
     @ViewBuilder
     private func connectedSections(_ info: DeviceInfo) -> some View {
         Section {
-            HStack(spacing: 12) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.green)
-                VStack(alignment: .leading) {
-                    Text(info.name).font(.headline)
-                    Text("Connected").font(.subheadline).foregroundStyle(.secondary)
+            HStack(spacing: 16) {
+                DeviceIcon()
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Polar Verity Sense").font(.headline)
+                    Text(info.name).font(.caption).foregroundStyle(.secondary)
+                    BatteryLabel(percent: info.batteryPercent)
                 }
             }
-        }
+            .padding(.vertical, 4)
 
-        Section("Details") {
-            LabeledContent("Model", value: info.model)
-            LabeledContent("Device ID", value: info.id)
-            LabeledContent("Firmware", value: info.firmwareVersion)
-            LabeledContent("Battery") {
-                Label("\(info.batteryPercent)%", systemImage: batterySymbol(info.batteryPercent))
+            NavigationLink {
+                SyncView()
+            } label: {
+                Label("Sync Recordings", systemImage: "arrow.triangle.2.circlepath")
+                    .foregroundStyle(Color.accentColor)
+                    .fontWeight(.semibold)
             }
+
+            if device.pendingRecordings.isEmpty {
+                Label("No new recordings", systemImage: "checkmark.circle")
+                    .foregroundStyle(.secondary)
+            } else {
+                Label(
+                    "\(device.pendingRecordings.count) new recordings (\(device.pendingBytes.fileSizeText))",
+                    systemImage: "tray.and.arrow.down"
+                )
+                .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Device Connected")
         }
 
-        Section("Data streams") {
-            StreamRow(name: "PPG (raw optical)", rate: "\(Int(VeritySense.ppgSampleRate)) Hz")
-            StreamRow(name: "Accelerometer", rate: "\(Int(VeritySense.accSampleRate)) Hz")
-            StreamRow(name: "Heart rate", rate: "1 Hz")
+        Section {
+            NavigationLink {
+                DeviceDetailsView(info: info)
+            } label: {
+                Label("Device Settings", systemImage: "gearshape")
+            }
+            NavigationLink {
+                RecordingSettingsView()
+            } label: {
+                Label("Recording Configuration", systemImage: "slider.horizontal.3")
+            }
+            LabeledContent {
+                Text("\(info.batteryPercent)%")
+            } label: {
+                Label("Battery Status", systemImage: "battery.75")
+            }
+            LabeledContent {
+                Text(info.firmwareVersion)
+            } label: {
+                Label("Firmware Version", systemImage: "cpu")
+            }
         }
 
         Section {
@@ -59,6 +84,42 @@ struct DeviceView: View {
             }
         }
     }
+
+    // MARK: Connecting
+
+    @ViewBuilder
+    private func connectingSections(_ target: DiscoveredDevice) -> some View {
+        Section {
+            VStack(spacing: 12) {
+                DeviceIcon(size: 96)
+                Text("Polar Verity Sense").font(.headline)
+                Text(target.name).font(.caption).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical)
+        }
+
+        Section {
+            ChecklistRow(title: "Device found", status: .done)
+            ChecklistRow(title: "Pairing…", status: status(for: .pairing))
+            ChecklistRow(title: "Connected", status: status(for: .connected))
+        }
+
+        Section {
+            Button("Cancel", role: .cancel) {
+                device.cancelConnect()
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private func status(for step: DeviceManager.ConnectStep) -> ChecklistRow.Status {
+        if device.connectStep > step { return .done }
+        if device.connectStep == step { return step == .connected ? .done : .active }
+        return .pending
+    }
+
+    // MARK: Scanning
 
     @ViewBuilder
     private var scanSections: some View {
@@ -112,8 +173,63 @@ struct DeviceView: View {
             }
         }
     }
+}
 
-    private func batterySymbol(_ percent: Int) -> String {
+private struct DeviceDetailsView: View {
+    let info: DeviceInfo
+
+    var body: some View {
+        List {
+            Section("Details") {
+                LabeledContent("Model", value: info.model)
+                LabeledContent("Device ID", value: info.id)
+                LabeledContent("Firmware", value: info.firmwareVersion)
+                LabeledContent("Battery", value: "\(info.batteryPercent)%")
+            }
+            Section("Supported sensors") {
+                ForEach(SensorStream.allCases) { stream in
+                    LabeledContent {
+                        Text(stream.rateLabel)
+                    } label: {
+                        Label(stream.title, systemImage: stream.systemImage)
+                    }
+                }
+            }
+        }
+        .navigationTitle("Device Settings")
+    }
+}
+
+/// Stand-in for a product photo of the sensor.
+struct DeviceIcon: View {
+    var size: CGFloat = 56
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: size * 0.3)
+                .fill(.black)
+            Circle()
+                .stroke(.gray, lineWidth: size * 0.04)
+                .padding(size * 0.22)
+            Text("POLAR")
+                .font(.system(size: size * 0.12, weight: .heavy))
+                .foregroundStyle(.red)
+                .offset(y: size * 0.36)
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+struct BatteryLabel: View {
+    let percent: Int
+
+    var body: some View {
+        Label("\(percent)%", systemImage: symbol)
+            .font(.subheadline)
+            .foregroundStyle(percent < 20 ? .red : .green)
+    }
+
+    private var symbol: String {
         switch percent {
         case 88...: "battery.100"
         case 63...: "battery.75"
@@ -124,22 +240,9 @@ struct DeviceView: View {
     }
 }
 
-private struct StreamRow: View {
-    let name: String
-    let rate: String
-
-    var body: some View {
-        HStack {
-            Image(systemName: "checkmark")
-                .foregroundStyle(.green)
-            Text(name)
-            Spacer()
-            Text(rate).foregroundStyle(.secondary)
-        }
-    }
-}
-
 #Preview {
-    DeviceView()
-        .previewEnvironment()
+    NavigationStack {
+        DeviceView()
+    }
+    .previewEnvironment()
 }

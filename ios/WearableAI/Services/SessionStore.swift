@@ -9,7 +9,7 @@ final class SessionStore {
 
     @ObservationIgnored private let directory: URL
 
-    private static let seededKey = "didSeedSampleSessions"
+    private static let seededKey = "didSeedSampleSessions.v2"
 
     init(directory: URL? = nil) {
         self.directory = directory ?? URL.documentsDirectory.appending(path: "Sessions", directoryHint: .isDirectory)
@@ -67,7 +67,7 @@ final class SessionStore {
     func generateSampleSessions(count: Int = 3) {
         for day in 1...count {
             let start = Calendar.current.date(byAdding: .day, value: -day, to: .now)!
-            let duration = TimeInterval.random(in: 180...360)
+            let duration = TimeInterval.random(in: 120...240)
             save(SyntheticSessionFactory.makeSession(start: start, duration: duration))
         }
     }

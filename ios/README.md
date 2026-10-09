@@ -22,40 +22,66 @@ New `.swift` files added under `WearableAI/` are picked up automatically.
 
 ## Screens
 
-| Tab | What it does |
+Follows Ali's end-to-end workflow diagram: **record on the Verity Sense → sync over BLE →
+save as CSV on the phone → upload to Dropbox**.
+
+| Where | Screen |
 |---|---|
-| Live | Heart rate, activity level, raw PPG waveform, accelerometer x/y/z, HR trend, record button |
-| Device | Scan, connect, device details (battery, firmware), active streams, disconnect |
-| Sessions | Saved recordings → detail view with HR and movement charts, summary stats, CSV export |
-| Settings | Data source info, generate or delete sample sessions |
+| First launch | Onboarding: welcome → how to wear it → connect device → recording settings |
+| Home tab | Daily Summary: device status and sync button, steps, heart rate, sleep, stress |
+| Trends tab | Week / month charts: steps, resting HR, sleep, active minutes |
+| Insights tab | Day / week / month comparisons ("You were 15% more active…") |
+| More → Device | Scan, connect (found / pairing / connected), battery, firmware, new recordings |
+| More → Recording Settings | Turn PPG / accelerometer / gyroscope / magnetometer on or off, continuous or scheduled |
+| More → Sync Recordings | Progress ring and steps: connecting → downloading → saving → converting to CSV |
+| More → Recordings | Synced recordings, each with charts and stats |
+| More → Export to CSV | Choose streams and time range, write CSV files |
+| More → Upload to Dropbox | Choose files, upload with progress (simulated for now) |
+| More → Live Data | Developer screen: live PPG / accelerometer / HR stream |
 
 ## Code layout
 
 ```
 WearableAI/
-  Models/        PPGSample, ACCSample, HRSample, RecordingSession, device info
-  Services/      SensorDataSource (protocol), MockVeritySenseSource, synthetic signals,
-                 DeviceManager (connection + live data + recording), SessionStore, CSV export
-  Processing/    Activity classification and session summaries
+  AppServices.swift  Creates the shared objects (swap the mock device here)
+  Models/        Sensor samples, recordings, device info, recording settings, daily summaries
+  Services/      SensorDataSource (protocol) + MockVeritySenseSource, DeviceManager,
+                 SyncManager, SessionStore, ExportStore (CSV), UploadManager (Dropbox)
+  Processing/    Activity classification and per-recording summaries
   Views/         SwiftUI screens and shared components
 ```
 
 ## Data format (placeholder — update to match the team's common format)
 
-| Stream | Rate | Fields |
+| Stream | Rate | CSV columns |
 |---|---|---|
-| PPG | 55 Hz | `timestamp_ns, ppg0, ppg1, ppg2, ambient` (raw ints) |
+| PPG | 55 Hz | `timestamp_ns, ppg0, ppg1, ppg2, ambient` |
 | Accelerometer | 52 Hz | `timestamp_ns, x_mg, y_mg, z_mg` |
-| Heart rate | ~1 Hz | `timestamp_ns, hr_bpm, rr_ms, contact` |
+| Gyroscope | 52 Hz | `timestamp_ns, x_dps, y_dps, z_dps` |
+| Magnetometer | 50 Hz | `timestamp_ns, x_gauss, y_gauss, z_gauss` |
+| HR & PPI | ~1 Hz | `timestamp_ns, hr_bpm, ppi_ms, contact` |
 
-Timestamps are nanoseconds since the Unix epoch. Sessions are saved as JSON in the app's
-Documents/Sessions folder, and each stream can be exported as CSV in the format above.
+Timestamps are nanoseconds since the Unix epoch. CSVs are saved per day as
+`Documents/Exports/<yyyy-MM-dd>/<stream>_<yyyyMMdd>.csv` and uploaded to
+`/VeritySense_Study/<participant>/<yyyy-MM-dd>/` in Dropbox.
+
+The diagram lists PPG at 28 Hz and the motion sensors at 26 Hz. The rates above are the
+Verity Sense defaults from Polar's SDK and are set in one place (`VeritySense` in
+`Models/SensorSamples.swift`).
+
+## Screenshots without a Mac
+
+Every push that changes `ios/` runs the **iOS build** GitHub Action: it builds the app on a
+macOS runner, opens each screen in the iPhone Simulator, and saves screenshots as the
+`ios-screenshots` artifact on the run page.
 
 ## Next steps
 
 - Match the models to Ethan's common data format once it's defined.
 - Add the Polar BLE SDK (Swift Package: `https://github.com/polarofficial/polar-ble-sdk`)
   and write a `PolarVeritySenseSource` that conforms to `SensorDataSource`, then use it in
-  `WearableAIApp.swift` instead of the mock. This needs a real iPhone, because the
+  `AppServices.swift` instead of the mock. This needs a real iPhone, because the
   Simulator has no Bluetooth.
+- Connect real Dropbox uploads (needs a Dropbox app key for the study; SwiftyDropbox SDK).
+- Replace the simulated daily summaries and insights with real processed data.
 - Keep the screens consistent with the Android app.
