@@ -8,7 +8,7 @@ options:
 packages:
   PolarBleSdk:
     url: https://github.com/polarofficial/polar-ble-sdk
-    from: 5.5.0
+    from: 6.0.0
   RxSwift:
     url: https://github.com/ReactiveX/RxSwift
     from: 6.5.0

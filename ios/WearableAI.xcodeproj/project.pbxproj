@@ -280,7 +280,7 @@
 			repositoryURL = "https://github.com/polarofficial/polar-ble-sdk";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 5.5.0;
+				minimumVersion = 6.0.0;
 			};
 		};
 		A1B2C3D40000000000000011 /* XCRemoteSwiftPackageReference "RxSwift" */ = {
