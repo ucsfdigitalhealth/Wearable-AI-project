@@ -85,13 +85,12 @@ Passive phone data (`Services/Passive/`) is always compiled. It writes `phone_gp
 iOS's required indicator). iOS has no screen on/off API, so the screen log has lock/unlock and
 app foreground/background events.
 
-The Polar and Dropbox code is written but gated by build flags, because it hasn't been
-compiled yet (no Mac). The **Build with Polar + Dropbox SDKs** CI job compiles it. When that job
-is green:
+The Polar and Dropbox code is compiled in (build flags `POLAR_SDK` and `DROPBOX_SDK` in
+`SWIFT_ACTIVE_COMPILATION_CONDITIONS`) and CI builds it, but it has not been run against real
+hardware or a real Dropbox account yet. The simulator is still the default.
 
-1. Add `POLAR_SDK DROPBOX_SDK` to *Active Compilation Conditions* (`SWIFT_ACTIVE_COMPILATION_CONDITIONS`).
-2. Real device: needs a physical iPhone. Then Study & Settings → *Use real Verity Sense*, restart.
-3. Dropbox: set `StudyConfig.dropboxAppKey` and replace `REPLACE_WITH_APP_KEY` in
+1. Real device: needs a physical iPhone. Study & Settings → *Use real Verity Sense*, restart.
+2. Dropbox: set `StudyConfig.dropboxAppKey` and replace `REPLACE_WITH_APP_KEY` in
    `Support/Info-extra.plist` (scheme `db-<app key>`). Then More → Upload → *Connect Dropbox*.
 
 ## Next steps
