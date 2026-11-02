@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum MoreDestination: String, Hashable {
-    case device, recordingSettings, sync, export, upload, recordings, live, settings
+    case device, recordingSettings, sync, export, upload, passive, recordings, live, settings
 }
 
 /// Device and data management, plus developer tools.
@@ -20,6 +20,7 @@ struct MoreView: View {
                     row(.recordings, "Recordings", "list.bullet.rectangle")
                     row(.export, "Export to CSV", "tablecells")
                     row(.upload, "Upload to Dropbox", "icloud.and.arrow.up")
+                    row(.passive, "Phone Data (GPS, motion)", "location.fill")
                 }
                 Section("Developer") {
                     row(.live, "Live Data", "waveform.path.ecg")
@@ -37,6 +38,7 @@ struct MoreView: View {
                 case .sync: SyncView()
                 case .export: ExportView()
                 case .upload: UploadView()
+                case .passive: PassiveDataView()
                 case .recordings: SessionsListView()
                 case .live: DashboardView()
                 case .settings: SettingsView()

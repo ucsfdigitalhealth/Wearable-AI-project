@@ -6,6 +6,8 @@ struct WearableAIApp: App {
 
     init() {
         services = AppServices()
+        // Restart passive collection after a relaunch (e.g. woken by a location change).
+        services.passive.resumeIfEnabled()
 
         // Launch argument `-demoConnect YES` connects to the simulated device right away
         // (used for CI screenshots).
@@ -18,6 +20,11 @@ struct WearableAIApp: App {
         WindowGroup {
             RootView()
                 .appEnvironment(services)
+                .onOpenURL { url in
+                    #if DROPBOX_SDK
+                    DropboxUploader.handleRedirect(url) { services.upload.refreshLogin() }
+                    #endif
+                }
         }
     }
 }

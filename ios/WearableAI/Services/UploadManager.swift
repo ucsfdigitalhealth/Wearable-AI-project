@@ -9,6 +9,15 @@ protocol CloudUploader {
         to remotePath: String,
         progress: @escaping @MainActor (Double) -> Void
     ) async throws
+
+    /// Whether the account is logged in (always true for the mock).
+    var isLinked: Bool { get }
+    @MainActor func link()
+}
+
+extension CloudUploader {
+    var isLinked: Bool { true }
+    @MainActor func link() {}
 }
 
 struct MockDropboxUploader: CloudUploader {
@@ -46,6 +55,24 @@ final class UploadManager {
         self.uploader = uploader
     }
 
+    var isSimulated: Bool { uploader is MockDropboxUploader }
+
+    /// True when uploads would go to a real account that still needs to be logged in.
+    var needsLogin: Bool {
+        _ = loginRevision   // makes SwiftUI refresh this after login
+        return !uploader.isLinked
+    }
+
+    func link() {
+        uploader.link()
+        loginRevision += 1
+    }
+
+    /// Bumped when login state may have changed, so views refresh `needsLogin`.
+    private(set) var loginRevision = 0
+
+    func refreshLogin() { loginRevision += 1 }
+
     var progress: Double {
         bytesTotal > 0 ? Double(bytesDone) / Double(bytesTotal) : 0
     }
@@ -57,6 +84,10 @@ final class UploadManager {
 
     func upload(_ files: [ExportedFile], participantId: String) async {
         guard status != .uploading, !files.isEmpty else { return }
+        guard uploader.isLinked else {
+            status = .failed("Dropbox isn't connected. Tap “Connect Dropbox” first.")
+            return
+        }
         status = .uploading
         bytesDone = 0
         bytesTotal = files.reduce(0) { $0 + $1.sizeBytes }

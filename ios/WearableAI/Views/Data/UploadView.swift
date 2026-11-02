@@ -15,9 +15,18 @@ struct UploadView: View {
             Section {
                 CloudBadge()
             } footer: {
-                Text("Simulated: Dropbox isn't connected yet. Files would go to /VeritySense_Study/\(participantId)/<date>/.")
+                Text(uploads.isSimulated
+                     ? "Simulated: Dropbox isn't connected yet. Files would go to /VeritySense_Study/\(participantId)/<date>/."
+                     : "Files go to /VeritySense_Study/\(participantId)/<date>/ in Dropbox.")
                     .frame(maxWidth: .infinity)
                     .multilineTextAlignment(.center)
+            }
+
+            if uploads.needsLogin {
+                Section {
+                    PrimaryButton(title: "Connect Dropbox") { uploads.link() }
+                        .plainListRow()
+                }
             }
 
             Section("Selected Files (\(selected.count))") {

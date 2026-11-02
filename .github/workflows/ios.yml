@@ -74,6 +74,7 @@ jobs:
           11-upload|-demoTab more -demoScreen upload -demoAutoStart YES|8
           12-recordings|-demoTab more -demoScreen recordings|4
           13-live-data|-demoTab more -demoScreen live -demoConnect YES|8
+          14-phone-data|-demoTab more -demoScreen passive|4
           SHOTS
 
       - name: Upload screenshots
@@ -83,3 +84,21 @@ jobs:
           name: ios-screenshots
           path: ios/screenshots/
           if-no-files-found: ignore
+
+  # Compiles the real Polar Verity Sense and Dropbox code (behind build flags). Failures here
+  # don't block the main job; they show what to fix before turning the flags on.
+  build-with-sdks:
+    name: Build with Polar + Dropbox SDKs
+    runs-on: macos-15
+    timeout-minutes: 30
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build with POLAR_SDK and DROPBOX_SDK
+        run: |
+          set -o pipefail
+          xcodebuild build             -project WearableAI.xcodeproj             -scheme WearableAI             -destination 'generic/platform=iOS Simulator'             -derivedDataPath build             CODE_SIGNING_ALLOWED=NO             SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) DEBUG POLAR_SDK DROPBOX_SDK'

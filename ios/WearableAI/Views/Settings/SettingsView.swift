@@ -6,6 +6,7 @@ struct SettingsView: View {
     @AppStorage("studyName") private var studyName = "RAPHE Study"
     @AppStorage("participantId") private var participantId = "P001"
     @AppStorage("hasOnboarded") private var hasOnboarded = true
+    @AppStorage("useRealDevice") private var useRealDevice = false
     @State private var confirmingDeleteAll = false
 
     private var appVersion: String {
@@ -27,14 +28,19 @@ struct SettingsView: View {
             }
 
             Section {
-                LabeledContent("Source", value: "Simulated Verity Sense")
+                if StudyConfig.polarAvailable {
+                    Toggle("Use real Verity Sense", isOn: $useRealDevice)
+                }
+                LabeledContent("Source", value: StudyConfig.polarAvailable && StudyConfig.useRealDevice ? "Polar Verity Sense" : "Simulated Verity Sense")
                 ForEach(SensorStream.allCases) { stream in
                     LabeledContent(stream.title, value: stream.rateLabel)
                 }
             } header: {
                 Text("Data source")
             } footer: {
-                Text("Fake data in the same format as the Polar Verity Sense. It will switch to the real device once Bluetooth support is added.")
+                Text(StudyConfig.polarAvailable
+                     ? "Restart the app after changing this. The real device needs a physical iPhone; the Simulator has no Bluetooth."
+                     : "Fake data in the same format as the Polar Verity Sense. This build doesn't include the Polar SDK yet.")
             }
 
             Section("Stored data") {

@@ -37,6 +37,7 @@ save as CSV on the phone → upload to Dropbox**.
 | More → Recordings | Synced recordings, each with charts and stats |
 | More → Export to CSV | Choose streams and time range, write CSV files |
 | More → Upload to Dropbox | Choose files, upload with progress (simulated for now) |
+| More → Phone Data | Turn on passive GPS, phone motion, activity/steps and lock/app-state logging (background) |
 | More → Live Data | Developer screen: live PPG / accelerometer / HR stream |
 
 ## Code layout
@@ -75,13 +76,28 @@ Every push that changes `ios/` runs the **iOS build** GitHub Action: it builds t
 macOS runner, opens each screen in the iPhone Simulator, and saves screenshots as the
 `ios-screenshots` artifact on the run page.
 
+## Real device, Dropbox and phone data
+
+Passive phone data (`Services/Passive/`) is always compiled. It writes `phone_gps_*.csv`,
+`phone_motion_*.csv`, `phone_activity_*.csv` and `phone_screen_*.csv` into the same
+`Exports/<day>/` folders, so they export and upload with the Verity Sense files. Needs
+"Always" location permission to keep running in the background (the blue status-bar pill is
+iOS's required indicator). iOS has no screen on/off API, so the screen log has lock/unlock and
+app foreground/background events.
+
+The Polar and Dropbox code is written but gated by build flags, because it hasn't been
+compiled yet (no Mac). The **Build with Polar + Dropbox SDKs** CI job compiles it. When that job
+is green:
+
+1. Add `POLAR_SDK DROPBOX_SDK` to *Active Compilation Conditions* (`SWIFT_ACTIVE_COMPILATION_CONDITIONS`).
+2. Real device: needs a physical iPhone. Then Study & Settings → *Use real Verity Sense*, restart.
+3. Dropbox: set `StudyConfig.dropboxAppKey` and replace `REPLACE_WITH_APP_KEY` in
+   `Support/Info-extra.plist` (scheme `db-<app key>`). Then More → Upload → *Connect Dropbox*.
+
 ## Next steps
 
 - Match the models to Ethan's common data format once it's defined.
-- Add the Polar BLE SDK (Swift Package: `https://github.com/polarofficial/polar-ble-sdk`)
-  and write a `PolarVeritySenseSource` that conforms to `SensorDataSource`, then use it in
-  `AppServices.swift` instead of the mock. This needs a real iPhone, because the
-  Simulator has no Bluetooth.
-- Connect real Dropbox uploads (needs a Dropbox app key for the study; SwiftyDropbox SDK).
+- Test `PolarVeritySenseSource` with the real sensor (Ethan has it) and fix any API mismatches.
+- Test real Dropbox uploads once the study's app key exists.
 - Replace the simulated daily summaries and insights with real processed data.
 - Keep the screens consistent with the Android app.
