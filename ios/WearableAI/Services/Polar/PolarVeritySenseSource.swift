@@ -155,7 +155,7 @@ final class PolarVeritySenseSource: NSObject, SensorDataSource {
             let data = try await api.getOfflineRecord(id, entry: entry, secret: nil).value
             switch data {
             case .accOfflineRecordingData(let d, _, _):
-                acc += d.samples.map { ACCSample(timestampNs: unix($0.timeStamp), x: $0.x, y: $0.y, z: $0.z) }
+                acc += d.map { ACCSample(timestampNs: unix($0.timeStamp), x: $0.x, y: $0.y, z: $0.z) }
             case .ppgOfflineRecordingData(let d, _, _):
                 ppg += d.samples.compactMap { sample in
                     let c = sample.channelSamples
@@ -163,9 +163,9 @@ final class PolarVeritySenseSource: NSObject, SensorDataSource {
                     return PPGSample(timestampNs: unix(sample.timeStamp), ppg0: c[0], ppg1: c[1], ppg2: c[2], ambient: c[3])
                 }
             case .gyroOfflineRecordingData(let d, _, _):
-                gyro += d.samples.map { GyroSample(timestampNs: unix($0.timeStamp), x: $0.x, y: $0.y, z: $0.z) }
+                gyro += d.map { GyroSample(timestampNs: unix($0.timeStamp), x: $0.x, y: $0.y, z: $0.z) }
             case .magOfflineRecordingData(let d, _, _):
-                mag += d.samples.map { MagSample(timestampNs: unix($0.timeStamp), x: $0.x, y: $0.y, z: $0.z) }
+                mag += d.map { MagSample(timestampNs: unix($0.timeStamp), x: $0.x, y: $0.y, z: $0.z) }
             case .hrOfflineRecordingData(let d, let start):
                 // HR samples carry no timestamps: one per second from the start time.
                 hr += d.enumerated().map { offset, s in
@@ -219,7 +219,7 @@ final class PolarVeritySenseSource: NSObject, SensorDataSource {
     func accStream() -> AsyncStream<[ACCSample]> {
         liveStream(.acc) { api, id, settings in
             api.startAccStreaming(id, settings: settings).map { data in
-                data.samples.map { ACCSample(timestampNs: self.unix($0.timeStamp), x: $0.x, y: $0.y, z: $0.z) }
+                data.map { ACCSample(timestampNs: self.unix($0.timeStamp), x: $0.x, y: $0.y, z: $0.z) }
             }
         }
     }
