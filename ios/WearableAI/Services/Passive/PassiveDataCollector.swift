@@ -166,7 +166,7 @@ final class PassiveDataCollector: NSObject {
 
     private func startActivity() {
         if CMMotionActivityManager.isActivityAvailable() {
-            activityManager.startActivityUpdates(to: motionQueue) { @Sendable [weak self] activity, _ in
+            activityManager.startActivityUpdates(to: motionQueue) { @Sendable [weak self] activity in
                 guard let self, let activity else { return }
                 let name = Self.name(of: activity)
                 let steps = self.steps

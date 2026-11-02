@@ -325,6 +325,10 @@ extension PolarVeritySenseSource: PolarBleApiDeviceInfoObserver {
         battery = Int(batteryLevel)
     }
 
+    func batteryChargingStatusReceived(_ identifier: String, chargingStatus: BleBasClient.ChargeState) {}
+
+    func disInformationReceivedWithKeysAsStrings(_ identifier: String, key: String, value: String) {}
+
     func disInformationReceived(_ identifier: String, uuid: CBUUID, value: String) {
         // 2A26 is the standard "Firmware Revision String" characteristic.
         if uuid == CBUUID(string: "2A26") { firmware = value.trimmingCharacters(in: .whitespacesAndNewlines) }
