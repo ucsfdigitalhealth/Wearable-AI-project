@@ -9,6 +9,9 @@ enum VeritySense {
     static let accSampleRate = 52.0   // Hz
     static let gyroSampleRate = 52.0  // Hz
     static let magSampleRate = 50.0   // Hz
+
+    /// Polar sensor timestamps count nanoseconds from 2000-01-01; samples here use Unix time.
+    static let polarEpochOffsetNs: Int64 = 946_684_800 * 1_000_000_000
 }
 
 /// The data streams the Verity Sense can record.

@@ -52,19 +52,28 @@ WearableAI/
   Views/         SwiftUI screens and shared components
 ```
 
-## Data format (placeholder — update to match the team's common format)
+## Data format (matches the backend sample files)
+
+The Verity Sense CSVs follow `backend/data/samples/demo_ppg.txt` and `demo_acc.txt` (Ethan's
+`data-pipeline` branch): `;` separator, a phone timestamp, then the sensor timestamp.
 
 | Stream | Rate | CSV columns |
 |---|---|---|
-| PPG | 55 Hz | `timestamp_ns, ppg0, ppg1, ppg2, ambient` |
-| Accelerometer | 52 Hz | `timestamp_ns, x_mg, y_mg, z_mg` |
-| Gyroscope | 52 Hz | `timestamp_ns, x_dps, y_dps, z_dps` |
-| Magnetometer | 50 Hz | `timestamp_ns, x_gauss, y_gauss, z_gauss` |
-| HR & PPI | ~1 Hz | `timestamp_ns, hr_bpm, ppi_ms, contact` |
+| PPG | 55 Hz | `Phone timestamp;sensor timestamp [ns];channel 0;channel 1;channel 2;ambient` |
+| Accelerometer | 52 Hz | `Phone timestamp;sensor timestamp [ns];X [mg];Y [mg];Z [mg]` |
+| Gyroscope | 52 Hz | `Phone timestamp;sensor timestamp [ns];X [dps];Y [dps];Z [dps]` |
+| Magnetometer | 50 Hz | `Phone timestamp;sensor timestamp [ns];X [gauss];Y [gauss];Z [gauss]` |
+| HR & PPI | ~1 Hz | `Phone timestamp;sensor timestamp [ns];HR [bpm];PPI [ms];contact` |
 
-Timestamps are nanoseconds since the Unix epoch. CSVs are saved per day as
-`Documents/Exports/<yyyy-MM-dd>/<stream>_<yyyyMMdd>.csv` and uploaded to
-`/VeritySense_Study/<participant>/<yyyy-MM-dd>/` in Dropbox.
+- Phone timestamp: UTC, `yyyy-MM-ddTHH:mm:ss.SSS`, no time zone suffix.
+- Sensor timestamp: nanoseconds since 2000-01-01 (Polar's epoch).
+- Every file has a header row (the PPG sample file has none).
+- Several PPI values in one HR row are joined with `|`.
+- Phone passive files (`phone_*.csv`) are still comma-separated with a single `timestamp_ns`
+  column (Unix epoch nanoseconds).
+
+CSVs are saved per day as `Documents/Exports/<yyyy-MM-dd>/<stream>_<yyyyMMdd>.csv` and
+uploaded to `/VeritySense_Study/<participant>/<yyyy-MM-dd>/` in Dropbox.
 
 The diagram lists PPG at 28 Hz and the motion sensors at 26 Hz. The rates above are the
 Verity Sense defaults from Polar's SDK and are set in one place (`VeritySense` in
@@ -95,7 +104,7 @@ hardware or a real Dropbox account yet. The simulator is still the default.
 
 ## Next steps
 
-- Match the models to Ethan's common data format once it's defined.
+- Confirm Ethan's loader reads these CSVs (and agree a format for the `phone_*.csv` files).
 - Test `PolarVeritySenseSource` with the real sensor (Ethan has it) and fix any API mismatches.
 - Test real Dropbox uploads once the study's app key exists.
 - Replace the simulated daily summaries and insights with real processed data.
