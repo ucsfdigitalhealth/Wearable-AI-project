@@ -1,0 +1,104 @@
+name: iOS build
+
+on:
+  push:
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+  pull_request:
+    paths:
+      - "ios/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build for Simulator
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project WearableAI.xcodeproj \
+            -scheme WearableAI \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Take screenshots
+        run: |
+          set -euo pipefail
+          APP=build/Build/Products/Debug-iphonesimulator/WearableAI.app
+          BUNDLE_ID=edu.wearableai.WearableAI
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          for runtime, items in sorted(devices.items(), reverse=True):
+              if "iOS" in runtime:
+                  for d in items:
+                      if d["name"].startswith("iPhone"):
+                          print(d["udid"]); sys.exit()
+          ')
+          echo "Using simulator $UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+          mkdir -p screenshots
+          # name | launch arguments ("same" = keep the previous launch running) | seconds to wait
+          while IFS='|' read -r name args wait; do
+            if [ "$args" != "same" ]; then
+              xcrun simctl terminate "$UDID" "$BUNDLE_ID" < /dev/null || true
+              xcrun simctl launch "$UDID" "$BUNDLE_ID" $args < /dev/null
+            fi
+            sleep "$wait"
+            xcrun simctl io "$UDID" screenshot "screenshots/$name.png" < /dev/null
+          done <<'SHOTS'
+          01-onboarding|-demoScreen onboarding|4
+          02-home|-demoTab home -demoConnect YES|6
+          03-trends|-demoTab trends|4
+          04-insights|-demoTab insights|4
+          05-more|-demoTab more|4
+          06-device|-demoTab more -demoScreen device -demoConnect YES|6
+          07-recording-settings|-demoTab more -demoScreen recordingSettings|4
+          08-sync-in-progress|-demoTab more -demoScreen sync -demoConnect YES -demoAutoStart YES|7
+          09-sync-complete|same|9
+          10-export|-demoTab more -demoScreen export|4
+          11-upload|-demoTab more -demoScreen upload -demoAutoStart YES|8
+          12-recordings|-demoTab more -demoScreen recordings|4
+          13-live-data|-demoTab more -demoScreen live -demoConnect YES|8
+          14-phone-data|-demoTab more -demoScreen passive|4
+          SHOTS
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-screenshots
+          path: ios/screenshots/
+          if-no-files-found: ignore
+
+  # Compiles the real Polar Verity Sense and Dropbox code (behind build flags). Failures here
+  # don't block the main job; they show what to fix before turning the flags on.
+  build-with-sdks:
+    name: Build with Polar + Dropbox SDKs
+    runs-on: macos-15
+    timeout-minutes: 30
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build with POLAR_SDK and DROPBOX_SDK
+        run: |
+          set -o pipefail
+          xcodebuild build             -project WearableAI.xcodeproj             -scheme WearableAI             -destination 'generic/platform=iOS Simulator'             -derivedDataPath build             CODE_SIGNING_ALLOWED=NO             SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) DEBUG POLAR_SDK DROPBOX_SDK'
