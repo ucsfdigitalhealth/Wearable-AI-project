@@ -102,3 +102,42 @@ jobs:
         run: |
           set -o pipefail
           xcodebuild build             -project WearableAI.xcodeproj             -scheme WearableAI             -destination 'generic/platform=iOS Simulator'             -derivedDataPath build             CODE_SIGNING_ALLOWED=NO             SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) DEBUG POLAR_SDK DROPBOX_SDK'
+
+  build-iphone:
+    name: Build unsigned iPhone IPA
+    runs-on: macos-15
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Archive for physical iPhone
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -project WearableAI.xcodeproj \
+            -scheme WearableAI \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/WearableAI.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Package unsigned IPA
+        run: |
+          set -euo pipefail
+          mkdir -p ipa/Payload
+          cp -R build/WearableAI.xcarchive/Products/Applications/WearableAI.app ipa/Payload/
+          cd ipa
+          zip -r WearableAI-unsigned.ipa Payload
+
+      - name: Upload iPhone IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: WearableAI-unsigned-IPA
+          path: ios/ipa/WearableAI-unsigned.ipa
+          if-no-files-found: error
