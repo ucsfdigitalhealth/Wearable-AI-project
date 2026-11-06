@@ -5,7 +5,7 @@ import Foundation
 /// real sample rates.
 final class MockVeritySenseSource: SensorDataSource {
     private var model = SyntheticSignalModel()
-    private var settings = RecordingSettings.load()
+    private var recording: Set<SensorStream> = []
     private var storedRecordings: [DeviceRecording] = []
 
     private let nearbyDevices = [
@@ -32,7 +32,7 @@ final class MockVeritySenseSource: SensorDataSource {
     func connect(to device: DiscoveredDevice) async throws -> DeviceInfo {
         try await Task.sleep(for: .seconds(1.5))
         model = SyntheticSignalModel()
-        storedRecordings = Self.makeStoredRecordings(streams: settings.enabledStreams)
+        storedRecordings = Self.makeStoredRecordings(streams: RecordingSettings.load().enabledStreams)
         return DeviceInfo(
             id: device.id,
             name: device.name,
@@ -44,9 +44,18 @@ final class MockVeritySenseSource: SensorDataSource {
 
     func disconnect() async {}
 
-    func apply(_ settings: RecordingSettings) async throws {
+    func recordingStatus() async throws -> Set<SensorStream> {
+        recording
+    }
+
+    func startRecording(_ streams: Set<SensorStream>) async throws {
         try await Task.sleep(for: .milliseconds(300))
-        self.settings = settings
+        recording.formUnion(streams)
+    }
+
+    func stopRecording() async throws {
+        try await Task.sleep(for: .milliseconds(300))
+        recording = []
     }
 
     func listRecordings() async throws -> [DeviceRecording] {

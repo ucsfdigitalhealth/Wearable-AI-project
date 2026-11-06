@@ -51,6 +51,36 @@ struct DeviceView: View {
         }
 
         Section {
+            LabeledContent {
+                Text(device.isSensorRecording ? "Recording" : "Not recording")
+                    .foregroundStyle(device.isSensorRecording ? .red : .secondary)
+            } label: {
+                Label("Sensor", systemImage: "record.circle")
+            }
+            if device.isSensorRecording {
+                SecondaryButton(title: "Stop Recording") {
+                    Task { await device.stopSensorRecording() }
+                }
+                .disabled(device.isUpdatingSensorRecording)
+                .padding(.vertical, 4)
+            } else {
+                PrimaryButton(title: "Start Recording", isLoading: device.isUpdatingSensorRecording) {
+                    Task { await device.startSensorRecording() }
+                }
+                .disabled(device.isUpdatingSensorRecording)
+                .padding(.vertical, 4)
+            }
+            if let error = device.recordingError {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+            }
+        } header: {
+            Text("Recording")
+        } footer: {
+            Text("Once started, the sensor records on its own, even away from the phone. Syncing stops the recording; start it again afterwards.")
+        }
+
+        Section {
             NavigationLink {
                 DeviceDetailsView(info: info)
             } label: {

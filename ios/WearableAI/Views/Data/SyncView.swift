@@ -46,6 +46,15 @@ struct SyncView: View {
                     }
                 }
 
+                if let warning = sync.warningMessage {
+                    Section {
+                        Label(warning, systemImage: "info.circle")
+                            .foregroundStyle(.secondary)
+                    } header: {
+                        Text("Some recordings had problems")
+                    }
+                }
+
                 Section {
                     if sync.currentStep == .complete {
                         PrimaryButton(title: "Upload to Dropbox") { showingUpload = true }
@@ -80,9 +89,10 @@ struct SyncView: View {
     private var statusText: String {
         switch sync.currentStep {
         case nil:
-            device.pendingRecordings.isEmpty
+            (device.pendingRecordings.isEmpty
                 ? "No new recordings on the device."
-                : "\(device.pendingRecordings.count) new recordings (\(device.pendingBytes.fileSizeText)) ready to sync."
+                : "\(device.pendingRecordings.count) new recordings (\(device.pendingBytes.fileSizeText)) ready to sync.")
+                + (device.isSensorRecording ? "\nSyncing stops the recording on the sensor first." : "")
         case .connecting:
             "Connecting to device…"
         case .downloading:

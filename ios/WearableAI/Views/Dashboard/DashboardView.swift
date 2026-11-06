@@ -19,11 +19,24 @@ struct DashboardView: View {
         }
         .background(Color(.systemGroupedBackground))
         .navigationTitle("Live Data")
+        // Stream only while this screen is open; streaming blocks offline recording.
+        .task(id: device.connectedDevice?.id) { device.startLiveStreams() }
+        .onDisappear { device.stopLiveStreams() }
     }
 
     private var liveContent: some View {
         ScrollView {
             VStack(spacing: 16) {
+                if device.isSensorRecording {
+                    Label(
+                        "The sensor is recording, so PPG and accelerometer can't stream live. Stop the recording on the Device screen to see them.",
+                        systemImage: "info.circle"
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
                 HStack(spacing: 16) {
                     MetricCard(
                         title: "Heart rate",

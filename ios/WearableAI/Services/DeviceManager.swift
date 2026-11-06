@@ -32,6 +32,10 @@ final class DeviceManager {
 
     private(set) var pendingRecordings: [DeviceRecording] = []
     private(set) var recordingSettings = RecordingSettings.load()
+    /// Streams the sensor is recording on its own (offline recording).
+    private(set) var sensorRecordingStreams: Set<SensorStream> = []
+    private(set) var isUpdatingSensorRecording = false
+    private(set) var recordingError: String?
 
     private(set) var recentPPG: [PPGSample] = []
     private(set) var recentACC: [ACCSample] = []
@@ -63,6 +67,7 @@ final class DeviceManager {
 
     var isScanning: Bool { state == .scanning }
     var isRecording: Bool { recordingStartDate != nil }
+    var isSensorRecording: Bool { !sensorRecordingStreams.isEmpty }
     var currentHR: HRSample? { hrHistory.last }
     var pendingBytes: Int64 { pendingRecordings.reduce(0) { $0 + $1.sizeBytes } }
 
@@ -102,8 +107,13 @@ final class DeviceManager {
                 let info = try await self.source.connect(to: device)
                 self.connectStep = .connected
                 self.state = .connected(info)
-                self.startStreams()
-                await self.refreshRecordings()
+                self.recordingError = nil
+                await self.refreshRecordingStatus()
+                do {
+                    try await self.refreshRecordings()
+                } catch {
+                    self.recordingError = "Couldn't list recordings: \(error.localizedDescription)"
+                }
             } catch is CancellationError {
                 self.state = .disconnected
             } catch {
@@ -123,12 +133,13 @@ final class DeviceManager {
         if isRecording {
             stopRecording()
         }
-        streamTasks.forEach { $0.cancel() }
-        streamTasks = []
+        stopLiveStreams()
         Task { await self.source.disconnect() }
 
         state = .disconnected
         pendingRecordings = []
+        sensorRecordingStreams = []
+        recordingError = nil
         recentPPG = []
         recentACC = []
         hrHistory = []
@@ -138,34 +149,75 @@ final class DeviceManager {
 
     // MARK: - Offline recordings
 
-    func refreshRecordings() async {
+    func refreshRecordings() async throws {
         guard connectedDevice != nil else { return }
-        do {
-            // Hide recordings that are already on the phone (e.g. from an interrupted sync).
-            let onPhone = Set(sessionStore.sessions.map(\.startDate.timeIntervalSince1970))
-            pendingRecordings = try await source.listRecordings()
-                .filter { !onPhone.contains($0.startDate.timeIntervalSince1970) }
-        } catch {
-            lastError = error.localizedDescription
-        }
+        // Hide recordings that are already on the phone (e.g. from a sync that couldn't
+        // remove them from the sensor).
+        let onPhone = Set(sessionStore.sessions.map(\.startDate.timeIntervalSince1970))
+        pendingRecordings = try await source.listRecordings()
+            .filter { !onPhone.contains($0.startDate.timeIntervalSince1970) }
     }
 
-    /// Downloads a recording, then removes it from the device.
+    /// Downloads a recording. It stays on the device until `deleteFromSensor` is called.
     func download(
         _ recording: DeviceRecording,
         progress: @escaping @MainActor (Double) -> Void
     ) async throws -> RecordingSession {
-        let session = try await source.download(recording, progress: progress)
-        try await source.deleteFromDevice(recording)
-        pendingRecordings.removeAll { $0.id == recording.id }
-        return session
+        try await source.download(recording, progress: progress)
     }
 
-    func apply(_ settings: RecordingSettings) async {
+    /// Removes a recording from the device. Call only after it is saved on the phone.
+    func deleteFromSensor(_ recording: DeviceRecording) async throws {
+        try await source.deleteFromDevice(recording)
+        pendingRecordings.removeAll { $0.id == recording.id }
+    }
+
+    /// Saves which streams to record. They're sent to the sensor when a recording starts.
+    func saveSettings(_ settings: RecordingSettings) {
         settings.save()
         recordingSettings = settings
-        if connectedDevice != nil {
-            try? await source.apply(settings)
+    }
+
+    // MARK: - Recording on the sensor
+
+    /// Starts recording the enabled streams on the sensor, which then records on its own.
+    func startSensorRecording() async {
+        guard connectedDevice != nil, !isUpdatingSensorRecording else { return }
+        isUpdatingSensorRecording = true
+        recordingError = nil
+        // The sensor can't stream and record PPG or accelerometer at the same time.
+        stopLiveStreams()
+        do {
+            try await source.startRecording(recordingSettings.enabledStreams)
+        } catch {
+            recordingError = error.localizedDescription
+        }
+        await refreshRecordingStatus()
+        isUpdatingSensorRecording = false
+    }
+
+    /// Stops every recording on the sensor. Returns false (and sets `recordingError`) if it fails.
+    @discardableResult
+    func stopSensorRecording() async -> Bool {
+        guard connectedDevice != nil else { return false }
+        isUpdatingSensorRecording = true
+        recordingError = nil
+        var stopped = true
+        do {
+            try await source.stopRecording()
+        } catch {
+            recordingError = error.localizedDescription
+            stopped = false
+        }
+        await refreshRecordingStatus()
+        isUpdatingSensorRecording = false
+        return stopped
+    }
+
+    func refreshRecordingStatus() async {
+        guard connectedDevice != nil else { return }
+        if let streams = try? await source.recordingStatus() {
+            sensorRecordingStreams = streams
         }
     }
 
@@ -202,7 +254,10 @@ final class DeviceManager {
 
     // MARK: - Streams
 
-    private func startStreams() {
+    /// Starts the live streams for the Live Data screen. They aren't needed for the
+    /// record-then-sync workflow, so they only run while that screen is open.
+    func startLiveStreams() {
+        guard connectedDevice != nil, streamTasks.isEmpty else { return }
         streamTasks = [
             Task {
                 for await batch in self.source.ppgStream() { self.handlePPG(batch) }
@@ -214,6 +269,11 @@ final class DeviceManager {
                 for await sample in self.source.hrStream() { self.handleHR(sample) }
             },
         ]
+    }
+
+    func stopLiveStreams() {
+        streamTasks.forEach { $0.cancel() }
+        streamTasks = []
     }
 
     private func handlePPG(_ batch: [PPGSample]) {

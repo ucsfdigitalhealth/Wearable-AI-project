@@ -7,7 +7,6 @@ struct RecordingSettingsView: View {
     @Environment(DeviceManager.self) private var device
     @Environment(\.dismiss) private var dismiss
     @State private var draft = RecordingSettings.load()
-    @State private var saving = false
 
     private let toggleableStreams: [SensorStream] = [.ppg, .acc, .gyro, .mag]
 
@@ -45,16 +44,14 @@ struct RecordingSettingsView: View {
 
             if showsSaveButton {
                 Section {
-                    PrimaryButton(title: "Save Settings", isLoading: saving) {
-                        Task {
-                            saving = true
-                            await device.apply(draft)
-                            saving = false
-                            dismiss()
-                        }
+                    PrimaryButton(title: "Save Settings") {
+                        device.saveSettings(draft)
+                        dismiss()
                     }
-                    .disabled(draft == device.recordingSettings || saving)
+                    .disabled(draft == device.recordingSettings)
                     .plainListRow()
+                } footer: {
+                    Text("Changes apply the next time you start a recording on the Device screen.")
                 }
             }
         }
@@ -62,7 +59,7 @@ struct RecordingSettingsView: View {
         .onChange(of: draft) {
             // During onboarding there's no Save button, so apply right away.
             if !showsSaveButton {
-                Task { await device.apply(draft) }
+                device.saveSettings(draft)
             }
         }
     }

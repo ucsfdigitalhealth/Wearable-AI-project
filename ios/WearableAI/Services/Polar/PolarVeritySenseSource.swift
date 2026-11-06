@@ -14,12 +14,15 @@ enum PolarSourceError: LocalizedError {
     case notConnected
     case timedOut
     case unsupported(String)
+    /// A step failed; the message says which step and which stream or file.
+    case failed(String)
 
     var errorDescription: String? {
         switch self {
         case .notConnected: "The Verity Sense isn't connected."
         case .timedOut: "Timed out connecting to the Verity Sense."
         case .unsupported(let what): "Unsupported: \(what)"
+        case .failed(let message): message
         }
     }
 }
@@ -34,6 +37,8 @@ final class PolarVeritySenseSource: NSObject, SensorDataSource {
     private var firmware = "–"
     private var battery = 0
     private var connectContinuation: CheckedContinuation<Void, Error>?
+    /// SDK features the connected device has reported ready.
+    private var readyFeatures: Set<PolarBleSdkFeature> = []
     /// Offline recording files on the device, grouped by recording folder.
     private var entriesByRecording: [String: [PolarOfflineRecordingEntry]] = [:]
 
@@ -52,6 +57,7 @@ final class PolarVeritySenseSource: NSObject, SensorDataSource {
         )
         api.observer = self
         api.deviceInfoObserver = self
+        api.deviceFeaturesObserver = self
     }
 
     // MARK: - Scan / connect
@@ -73,6 +79,7 @@ final class PolarVeritySenseSource: NSObject, SensorDataSource {
 
     func connect(to device: DiscoveredDevice) async throws -> DeviceInfo {
         deviceId = device.id
+        readyFeatures = []
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask {
                 try await withCheckedThrowingContinuation { continuation in
@@ -90,6 +97,11 @@ final class PolarVeritySenseSource: NSObject, SensorDataSource {
             _ = try await group.next()
             group.cancelAll()
         }
+        // The offline recording calls only work once the SDK reports the feature ready,
+        // which happens a moment after connecting.
+        for _ in 0..<50 where !readyFeatures.contains(.feature_polar_offline_recording) {
+            try await Task.sleep(for: .milliseconds(200))
+        }
         // Keep the device clock right so offline recordings get correct timestamps.
         try? await api.setLocalTime(device.id, time: .now, zone: .current).value
         return DeviceInfo(id: device.id, name: device.name, model: "Polar Verity Sense", firmwareVersion: firmware, batteryPercent: battery)
@@ -98,22 +110,55 @@ final class PolarVeritySenseSource: NSObject, SensorDataSource {
     func disconnect() async {
         if let deviceId { try? api.disconnectFromDevice(deviceId) }
         deviceId = nil
+        readyFeatures = []
         entriesByRecording = [:]
     }
 
     // MARK: - Offline recordings
 
-    func apply(_ settings: RecordingSettings) async throws {
+    func recordingStatus() async throws -> Set<SensorStream> {
         let id = try requireId()
-        for stream in SensorStream.allCases {
+        let status = try await api.getOfflineRecordingStatus(id).value
+        return Set(status.filter({ $0.value }).keys.compactMap(Self.stream))
+    }
+
+    func startRecording(_ streams: Set<SensorStream>) async throws {
+        let id = try requireId()
+        let available = try await api.getAvailableOfflineRecordingDataTypes(id).value
+        let active = try await recordingStatus()
+        var failures: [String] = []
+        for stream in SensorStream.allCases where streams.contains(stream) && !active.contains(stream) {
             let feature = Self.dataType(stream)
-            if settings.enabledStreams.contains(stream) {
-                let sensorSettings = stream == .hr ? nil : try await api.requestOfflineRecordingSettings(id, feature: feature).value.maxSettings()
-                // Fails harmlessly if this stream is already recording.
-                try? await api.startOfflineRecording(id, feature: feature, settings: sensorSettings, secret: nil).value
-            } else {
-                try? await api.stopOfflineRecording(id, feature: feature).value
+            guard available.contains(feature) else {
+                failures.append("\(stream.title) (not supported by this sensor)")
+                continue
             }
+            do {
+                let settings = stream == .hr ? nil : try await api.requestOfflineRecordingSettings(id, feature: feature).value.maxSettings()
+                try await api.startOfflineRecording(id, feature: feature, settings: settings, secret: nil).value
+            } catch {
+                failures.append("\(stream.title) (\(Self.describe(error)))")
+            }
+        }
+        if !failures.isEmpty {
+            throw PolarSourceError.failed("Couldn't start recording " + failures.joined(separator: ", "))
+        }
+    }
+
+    func stopRecording() async throws {
+        let id = try requireId()
+        // Uses the raw status so types this app doesn't record (e.g. PPI started by another app) stop too.
+        let status = try await api.getOfflineRecordingStatus(id).value
+        var failures: [String] = []
+        for feature in status.filter({ $0.value }).keys {
+            do {
+                try await api.stopOfflineRecording(id, feature: feature).value
+            } catch {
+                failures.append("\(feature) (\(Self.describe(error)))")
+            }
+        }
+        if !failures.isEmpty {
+            throw PolarSourceError.failed("Couldn't stop recording " + failures.joined(separator: ", "))
         }
     }
 
@@ -152,7 +197,14 @@ final class PolarVeritySenseSource: NSObject, SensorDataSource {
         var mag: [MagSample] = [], hr: [HRSample] = []
 
         for (index, entry) in entries.enumerated() {
-            let data = try await api.getOfflineRecord(id, entry: entry, secret: nil).value
+            let data: PolarOfflineRecordingData
+            do {
+                data = try await fetch(entry, deviceId: id) { fraction in
+                    progress((Double(index) + fraction) / Double(entries.count))
+                }
+            } catch {
+                throw PolarSourceError.failed("Couldn't download \(Self.name(entry)): \(Self.describe(error))")
+            }
             switch data {
             case .accOfflineRecordingData(let d, _, _):
                 acc += d.map { ACCSample(timestampNs: unix($0.timeStamp), x: $0.x, y: $0.y, z: $0.z) }
@@ -197,9 +249,30 @@ final class PolarVeritySenseSource: NSObject, SensorDataSource {
     func deleteFromDevice(_ recording: DeviceRecording) async throws {
         let id = try requireId()
         for entry in entriesByRecording[recording.id] ?? [] {
-            try await api.removeOfflineRecord(id, entry: entry).value
+            do {
+                try await api.removeOfflineRecord(id, entry: entry).value
+            } catch {
+                throw PolarSourceError.failed("Couldn't remove \(Self.name(entry)) from the sensor: \(Self.describe(error))")
+            }
         }
         entriesByRecording[recording.id] = nil
+    }
+
+    /// Downloads one file the way Polar's example app does, reporting progress as 0...1.
+    private func fetch(
+        _ entry: PolarOfflineRecordingEntry,
+        deviceId id: String,
+        progress: @escaping @MainActor (Double) -> Void
+    ) async throws -> PolarOfflineRecordingData {
+        for try await result in api.getOfflineRecordWithProgress(id, entry: entry, secret: nil).values {
+            switch result {
+            case .progress(let p):
+                if p.totalBytes > 0 { await progress(Double(p.bytesDownloaded) / Double(p.totalBytes)) }
+            case .complete(let data):
+                return data
+            }
+        }
+        throw PolarSourceError.failed("The sensor sent no data")
     }
 
     // MARK: - Live streaming
@@ -273,6 +346,16 @@ final class PolarVeritySenseSource: NSObject, SensorDataSource {
         return deviceId
     }
 
+    /// e.g. "PPG (/U/0/20261106/R/132000/PPG0.REC)"
+    private static func name(_ entry: PolarOfflineRecordingEntry) -> String {
+        "\(stream(entry.type)?.title ?? "\(entry.type)") (\(entry.path))"
+    }
+
+    /// SDK errors print better with `describing:`, e.g. "responseError(errorCode: 100)".
+    private static func describe(_ error: Error) -> String {
+        error is LocalizedError ? error.localizedDescription : String(describing: error)
+    }
+
     /// Converts a sensor timestamp to Unix-epoch nanoseconds. Values already in Unix time
     /// (larger than ~2027 in Polar time) are left alone.
     private func unix(_ polarNs: UInt64) -> Int64 {
@@ -317,6 +400,12 @@ extension PolarVeritySenseSource: PolarBleApiObserver {
             continuation.resume(throwing: PolarSourceError.notConnected)
             connectContinuation = nil
         }
+    }
+}
+
+extension PolarVeritySenseSource: PolarBleApiDeviceFeaturesObserver {
+    func bleSdkFeatureReady(_ identifier: String, feature: PolarBleSdkFeature) {
+        readyFeatures.insert(feature)
     }
 }
 

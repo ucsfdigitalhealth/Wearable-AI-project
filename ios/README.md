@@ -31,14 +31,14 @@ save as CSV on the phone → upload to Dropbox**.
 | Home tab | Daily Summary: device status and sync button, steps, heart rate, sleep, stress |
 | Trends tab | Week / month charts: steps, resting HR, sleep, active minutes |
 | Insights tab | Day / week / month comparisons ("You were 15% more active…") |
-| More → Device | Scan, connect (found / pairing / connected), battery, firmware, new recordings |
-| More → Recording Settings | Turn PPG / accelerometer / gyroscope / magnetometer on or off, continuous or scheduled |
-| More → Sync Recordings | Progress ring and steps: connecting → downloading → saving → converting to CSV |
+| More → Device | Scan, connect (found / pairing / connected), start / stop recording on the sensor, battery, firmware, new recordings |
+| More → Recording Settings | Choose PPG / accelerometer / gyroscope / magnetometer and continuous or scheduled (used when the next recording starts) |
+| More → Sync Recordings | Stops the sensor's recording, then downloads → converts to CSV → saves, and only then removes recordings from the sensor |
 | More → Recordings | Synced recordings, each with charts and stats |
 | More → Export to CSV | Choose streams and time range, write CSV files |
 | More → Upload to Dropbox | Choose files, upload with progress (simulated for now) |
 | More → Phone Data | Turn on passive GPS, phone motion, activity/steps and lock/app-state logging (background) |
-| More → Live Data | Developer screen: live PPG / accelerometer / HR stream |
+| More → Live Data | Developer screen: live PPG / accelerometer / HR stream (only streams while open; PPG and accelerometer can't stream while the sensor records them) |
 
 ## Code layout
 

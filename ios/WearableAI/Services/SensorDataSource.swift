@@ -9,8 +9,13 @@ protocol SensorDataSource: AnyObject {
 
     // MARK: Offline recordings (the main workflow: record on the device, sync later)
 
-    /// Sends the recording configuration to the device.
-    func apply(_ settings: RecordingSettings) async throws
+    /// Streams the device is recording right now.
+    func recordingStatus() async throws -> Set<SensorStream>
+    /// Starts recording these streams on the device. Throws if any of them fails to start.
+    func startRecording(_ streams: Set<SensorStream>) async throws
+    /// Stops every recording on the device. Polar recommends this before downloading or
+    /// deleting recordings.
+    func stopRecording() async throws
     /// Recordings stored on the device that haven't been downloaded yet.
     func listRecordings() async throws -> [DeviceRecording]
     /// Downloads one recording over BLE. `progress` is called with 0...1.
@@ -22,6 +27,8 @@ protocol SensorDataSource: AnyObject {
     func deleteFromDevice(_ recording: DeviceRecording) async throws
 
     // MARK: Live streaming (used by the Live Data screen)
+    // Cancelling the task that reads a stream stops it on the device. PPG and accelerometer
+    // can't stream while the device is recording them.
 
     /// Batches of PPG samples (the device sends data in batches, not one sample at a time).
     func ppgStream() -> AsyncStream<[PPGSample]>
