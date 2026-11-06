@@ -85,6 +85,16 @@ Every push that changes `ios/` runs the **iOS build** GitHub Action: it builds t
 macOS runner, opens each screen in the iPhone Simulator, and saves screenshots as the
 `ios-screenshots` artifact on the run page.
 
+Screenshots from the simulator (simulated data) are saved in [`screenshots/`](screenshots/):
+
+| | | |
+|---|---|---|
+| ![Onboarding](screenshots/01-onboarding.png) | ![Home](screenshots/02-home.png) | ![Trends](screenshots/03-trends.png) |
+| ![Insights](screenshots/04-insights.png) | ![More](screenshots/05-more.png) | ![Device](screenshots/06-device.png) |
+| ![Recording settings](screenshots/07-recording-settings.png) | ![Sync in progress](screenshots/08-sync-in-progress.png) | ![Sync complete](screenshots/09-sync-complete.png) |
+| ![Export](screenshots/10-export.png) | ![Upload](screenshots/11-upload.png) | ![Recordings](screenshots/12-recordings.png) |
+| ![Live data](screenshots/13-live-data.png) | ![Phone data](screenshots/14-phone-data.png) | |
+
 ## Real device, Dropbox and phone data
 
 Passive phone data (`Services/Passive/`) is always compiled. It writes `phone_gps_*.csv`,
