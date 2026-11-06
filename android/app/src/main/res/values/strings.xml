@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">WearableAI</string>
+    <string name="passive_notification">Phone sensor collection is active</string>
+</resources>
