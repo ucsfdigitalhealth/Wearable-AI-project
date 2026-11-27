@@ -1,0 +1,10 @@
+# Raw participant recordings and derived outputs may contain health data.
+# Do not commit them. (The demo_* files were committed before this rule.)
+data/samples/recording_*/
+data/raw/
+results/
+
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
