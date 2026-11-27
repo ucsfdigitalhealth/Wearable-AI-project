@@ -23,5 +23,10 @@
 		<string>dbapi-8-emm</string>
 		<string>dbapi-2</string>
 	</array>
+	<!-- Show the app's Documents folder (Exports/, Sessions/) in the Files app. -->
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 </dict>
 </plist>

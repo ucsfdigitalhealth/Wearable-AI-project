@@ -10,7 +10,8 @@ struct SyncView: View {
 
     var body: some View {
         List {
-            if device.connectedDevice == nil && !sync.isSyncing {
+            // Keep showing the result if the sensor disconnects after a sync.
+            if device.connectedDevice == nil && sync.currentStep == nil && sync.errorMessage == nil {
                 Section {
                     ContentUnavailableView {
                         Label("No device connected", systemImage: "dot.radiowaves.left.and.right")
@@ -66,7 +67,7 @@ struct SyncView: View {
                         ) {
                             Task { await sync.sync(device: device, sessions: sessions, exports: exports) }
                         }
-                        .disabled(sync.isSyncing)
+                        .disabled(sync.isSyncing || device.connectedDevice == nil)
                         .plainListRow()
                     }
                 }

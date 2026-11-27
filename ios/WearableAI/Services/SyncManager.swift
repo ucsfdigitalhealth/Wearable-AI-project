@@ -110,12 +110,17 @@ final class SyncManager {
         }
         try? await Task.sleep(for: .milliseconds(500))
 
-        // Only now remove them from the sensor, so a failure here can't lose data.
-        for item in downloaded {
+        // Only now remove them from the sensor, so a failure here can't lose data. Also
+        // remove recordings an earlier sync saved but couldn't remove.
+        let toRemove = downloaded.map { $0.recording } + device.recordingsToRemove
+        for (index, recording) in toRemove.enumerated() {
             do {
-                try await device.deleteFromSensor(item.recording)
+                try await device.deleteFromSensor(recording)
             } catch {
-                problems.append("Saved on the phone, but \(error.localizedDescription)")
+                // Usually the sensor disconnected, so the rest would fail too.
+                let left = toRemove.count - index
+                problems.append("Saved on the phone, but \(left) recording\(left == 1 ? "" : "s") couldn't be removed from the sensor (\(error.localizedDescription)). The next sync will remove \(left == 1 ? "it" : "them").")
+                break
             }
         }
 

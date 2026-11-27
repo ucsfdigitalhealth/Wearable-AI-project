@@ -4,6 +4,7 @@ import Foundation
 /// after a short delay, connecting takes a moment, and data arrives in batches at the
 /// real sample rates.
 final class MockVeritySenseSource: SensorDataSource {
+    var onDisconnect: (() -> Void)?
     private var model = SyntheticSignalModel()
     private var recording: Set<SensorStream> = []
     private var storedRecordings: [DeviceRecording] = []

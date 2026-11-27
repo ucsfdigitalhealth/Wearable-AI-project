@@ -31,6 +31,9 @@ final class DeviceManager {
     private(set) var lastError: String?
 
     private(set) var pendingRecordings: [DeviceRecording] = []
+    /// Recordings still on the sensor that are already saved on the phone (e.g. the sensor
+    /// disconnected before a sync could remove them). The next sync removes them.
+    private(set) var recordingsToRemove: [DeviceRecording] = []
     private(set) var recordingSettings = RecordingSettings.load()
     /// Streams the sensor is recording on its own (offline recording).
     private(set) var sensorRecordingStreams: Set<SensorStream> = []
@@ -58,6 +61,9 @@ final class DeviceManager {
     init(source: SensorDataSource, sessionStore: SessionStore) {
         self.source = source
         self.sessionStore = sessionStore
+        source.onDisconnect = { [weak self] in
+            Task { @MainActor in self?.sensorDisconnected() }
+        }
     }
 
     var connectedDevice: DeviceInfo? {
@@ -138,6 +144,7 @@ final class DeviceManager {
 
         state = .disconnected
         pendingRecordings = []
+        recordingsToRemove = []
         sensorRecordingStreams = []
         recordingError = nil
         recentPPG = []
@@ -151,11 +158,10 @@ final class DeviceManager {
 
     func refreshRecordings() async throws {
         guard connectedDevice != nil else { return }
-        // Hide recordings that are already on the phone (e.g. from a sync that couldn't
-        // remove them from the sensor).
         let onPhone = Set(sessionStore.sessions.map(\.startDate.timeIntervalSince1970))
-        pendingRecordings = try await source.listRecordings()
-            .filter { !onPhone.contains($0.startDate.timeIntervalSince1970) }
+        let onSensor = try await source.listRecordings()
+        pendingRecordings = onSensor.filter { !onPhone.contains($0.startDate.timeIntervalSince1970) }
+        recordingsToRemove = onSensor.filter { onPhone.contains($0.startDate.timeIntervalSince1970) }
     }
 
     /// Downloads a recording. It stays on the device until `deleteFromSensor` is called.
@@ -170,6 +176,14 @@ final class DeviceManager {
     func deleteFromSensor(_ recording: DeviceRecording) async throws {
         try await source.deleteFromDevice(recording)
         pendingRecordings.removeAll { $0.id == recording.id }
+        recordingsToRemove.removeAll { $0.id == recording.id }
+    }
+
+    /// The sensor dropped the connection (out of range, switched off, or turned itself off).
+    private func sensorDisconnected() {
+        guard connectedDevice != nil else { return }
+        disconnect()
+        lastError = "The sensor disconnected. Make sure it's on and nearby, then connect again."
     }
 
     /// Saves which streams to record. They're sent to the sensor when a recording starts.

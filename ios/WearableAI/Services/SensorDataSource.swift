@@ -3,6 +3,9 @@ import Foundation
 /// Where sensor data comes from. `MockVeritySenseSource` implements it for now; a
 /// `PolarVeritySenseSource` built on the Polar BLE SDK will replace it later.
 protocol SensorDataSource: AnyObject {
+    /// Called on the main queue when a connected device drops the connection by itself.
+    var onDisconnect: (() -> Void)? { get set }
+
     func scan() -> AsyncStream<DiscoveredDevice>
     func connect(to device: DiscoveredDevice) async throws -> DeviceInfo
     func disconnect() async

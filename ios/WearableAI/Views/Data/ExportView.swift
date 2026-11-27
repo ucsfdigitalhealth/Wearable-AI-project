@@ -17,6 +17,7 @@ struct ExportView: View {
     @State private var to = Date.now
     @State private var exported: [ExportedFile] = []
     @State private var showingUpload = false
+    @State private var showingShare = false
 
     var body: some View {
         Form {
@@ -54,11 +55,15 @@ struct ExportView: View {
             Section {
                 PrimaryButton(title: "Export to CSV") {
                     exported = exports.export(days: selectedSessions, allSessions: sessions.sessions, streams: streams)
+                    // Open the share sheet right away so the files can be saved, sent or opened.
+                    showingShare = !exported.isEmpty
                 }
                 .disabled(streams.isEmpty || selectedSessions.isEmpty)
                 .plainListRow()
             } footer: {
-                Text(selectedSessions.isEmpty ? "No recordings in this range." : "Files will be saved to your phone.")
+                Text(selectedSessions.isEmpty
+                     ? "No recordings in this range."
+                     : "Files are also saved in the Files app under On My iPhone → WearableAI → Exports.")
                     .frame(maxWidth: .infinity)
                     .multilineTextAlignment(.center)
             }
@@ -80,6 +85,9 @@ struct ExportView: View {
         }
         .navigationTitle("Export Data")
         .navigationDestination(isPresented: $showingUpload) { UploadView() }
+        .sheet(isPresented: $showingShare) {
+            ShareSheet(items: exported.map(\.url))
+        }
     }
 
     private var fullRangeText: String? {

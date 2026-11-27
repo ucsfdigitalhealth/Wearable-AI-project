@@ -29,6 +29,8 @@ enum PolarSourceError: LocalizedError {
 
 /// Talks to a real Polar Verity Sense over Bluetooth. Replaces `MockVeritySenseSource`.
 final class PolarVeritySenseSource: NSObject, SensorDataSource {
+    var onDisconnect: (() -> Void)?
+
     /// Polar timestamps count nanoseconds from 2000-01-01; we store Unix-epoch nanoseconds.
     private static let polarEpochOffsetNs: Int64 = 946_684_800 * 1_000_000_000
 
@@ -399,6 +401,9 @@ extension PolarVeritySenseSource: PolarBleApiObserver {
         if let continuation = connectContinuation {
             continuation.resume(throwing: PolarSourceError.notConnected)
             connectContinuation = nil
+        } else if polarDeviceInfo.deviceId == deviceId {
+            // Not a disconnect we asked for (`disconnect()` clears `deviceId` first).
+            onDisconnect?()
         }
     }
 }
